@@ -8,28 +8,18 @@ const WEIGHT_STEP = 0.1;
 const INITIAL_RENDER_LIMIT = 100;
 const RENDER_BATCH = 100;
 
-const PRESETS = {
-  balanced: {
-    label: "均衡车手",
-    weights: {championship_points: 10, race_starts: 10, points_per_start: 4, wins: 5, win_rate: 6, podiums: 5, pole_positions: 3, podium_rate: 6, average_finish_position: 8, average_qualifying_position: 6, average_positions_gained: 4, finish_rate: 7, race_pace_score: 7, lap_consistency_score: 6, overtakes_per_start: 4, net_overtakes_per_start: 4, team_points_share: 5}
-  },
-  pace: {
-    label: "纯粹速度",
-    weights: {championship_points: 0, race_starts: 5, points_per_start: 5, wins: 0, win_rate: 3, podiums: 0, pole_positions: 7, podium_rate: 2, average_finish_position: 8, average_qualifying_position: 26, average_positions_gained: 0, finish_rate: 2, race_pace_score: 28, lap_consistency_score: 14, overtakes_per_start: 0, net_overtakes_per_start: 0, team_points_share: 0}
-  },
-  racecraft: {
-    label: "赛道缠斗",
-    weights: {championship_points: 8, race_starts: 10, points_per_start: 4, wins: 5, win_rate: 2, podiums: 6, pole_positions: 2, podium_rate: 3, average_finish_position: 10, average_qualifying_position: 2, average_positions_gained: 13, finish_rate: 8, race_pace_score: 2, lap_consistency_score: 2, overtakes_per_start: 10, net_overtakes_per_start: 10, team_points_share: 3}
-  },
-  reliability: {
-    label: "稳定完赛",
-    weights: {championship_points: 10, race_starts: 10, points_per_start: 8, wins: 3, win_rate: 2, podiums: 6, pole_positions: 1, podium_rate: 7, average_finish_position: 10, average_qualifying_position: 2, average_positions_gained: 3, finish_rate: 25, race_pace_score: 3, lap_consistency_score: 10, overtakes_per_start: 0, net_overtakes_per_start: 0, team_points_share: 0}
-  }
-};
+// Recommendation entries require a published numeric weight table for these exact metrics.
+// The reviewed F1/AWS methods do not supply one; see PRESET_SOURCES.md.
+const PRESETS = {};
+const DEFAULT_METRIC_WEIGHT = 10;
 
 const SCENARIO_COLORS = ["#f00827", "#43d5ff", "#c7ff38", "#ffb020", "#ba75ff", "#ff6fb1"];
+// Keep the original F1 metric palette stable across historical and modern datasets.
 const METRIC_COLORS = ["#fa4e55", "#86d9ff", "#ff8b4d", "#ffc24b", "#fae065", "#d2a7ff", "#ff6c9b", "#a6d665", "#43c4a7", "#49b9dd", "#667fe0", "#a37ce2", "#e783c5", "#d7aa68", "#88bfd0", "#b7c85e", "#f2a66b"];
-const COUNTRY_REGIONS = {NED: "NL", USA: "US", GBR: "GB", FRA: "FR", MEX: "MX", ESP: "ES", MON: "MC", CAN: "CA", DEN: "DK", JPN: "JP", THA: "TH", CHN: "CN", GER: "DE", FIN: "FI", AUS: "AU"};
+function metricColor(key) { return METRIC_COLORS[Math.max(0, METRIC_KEYS.indexOf(key)) % METRIC_COLORS.length]; }
+const COUNTRY_REGIONS = {ARG:"AR",AUS:"AU",AUT:"AT",BEL:"BE",BRA:"BR",CAN:"CA",CHE:"CH",CHL:"CL",CHN:"CN",COL:"CO",CZE:"CZ",DEN:"DK",DEU:"DE",DNK:"DK",ESP:"ES",FIN:"FI",FRA:"FR",GBR:"GB",GER:"DE",HUN:"HU",IDN:"ID",IND:"IN",IRL:"IE",ITA:"IT",JPN:"JP",LIE:"LI",MAR:"MA",MCO:"MC",MEX:"MX",MON:"MC",MYS:"MY",NED:"NL",NLD:"NL",NZL:"NZ",POL:"PL",PRT:"PT",RUS:"RU",SWE:"SE",THA:"TH",URY:"UY",USA:"US",VEN:"VE",ZAF:"ZA",ZWE:"ZW"};
+const TEAM_MARKS = {"Mercedes":"mercedes","Ferrari":"ferrari","Red Bull Racing":"redbullracing","Red Bull":"redbullracing","McLaren":"mclaren","Racing Bulls":"racingbulls","Alpine":"alpine","Haas F1 Team":"haasf1team","Haas":"haasf1team","Audi":"audi","Williams":"williams","Aston Martin":"astonmartin","Cadillac":"cadillac"};
+
 
 const state = {
   metadata: null,
@@ -37,12 +27,12 @@ const state = {
   weights: {},
   enabled: {},
   language: LOCALES[localStorage.getItem(LANGUAGE_STORAGE_KEY)] ? localStorage.getItem(LANGUAGE_STORAGE_KEY) : "en",
-  activePreset: "balanced",
-  pointsMode: "historical",
-  currentPoints: null,
+  activePreset: null,
+  activeScenario: null,
+  overview: false,
+  page: 0,
   ranked: [],
   scenarios: [],
-  compact: false,
   search: "",
   filters: {team: "all", country: "all", era: "all", achievement: "all", minStarts: 0},
   view: "stacked",
@@ -78,13 +68,6 @@ function applyLanguage(language) {
   document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => { element.placeholder = t(element.dataset.i18nPlaceholder); });
   document.querySelectorAll("[data-i18n-aria]").forEach((element) => { element.setAttribute("aria-label", t(element.dataset.i18nAria)); });
   document.querySelectorAll("[data-i18n-title]").forEach((element) => { element.title = t(element.dataset.i18nTitle); });
-  $("#points-mode-note").hidden = state.pointsMode !== "current";
-  const allOption = $("#season-select option[value='all']");
-  if (allOption) allOption.textContent = t("allSeasons");
-  const modernOption = $("#season-select option[value='modern']");
-  if (modernOption) modernOption.textContent = t("modernSeasons");
-  const rangeOption = $("#season-select option[data-custom-range]");
-  if (rangeOption) rangeOption.textContent = t("customRange", {range: rangeOption.value.replace("-", "–")});
   if (state.dataset) {
     updateSeasonNote(state.dataset.year);
     renderQuality();
@@ -100,74 +83,16 @@ function seasonOptionLabel(year) {
   return String(year);
 }
 
-function updateSeasonNote(year) {
-  const note = $("#season-note");
-  let key = "";
-  if (String(year) === "all") key = "allSeasonNote";
-  else if (String(year) === "modern") key = "modernSeasonNote";
-  else if (/^\d{4}-\d{4}$/.test(String(year))) key = Number(String(year).slice(0, 4)) < 2023 ? "historicalRangeNote" : "modernRangeNote";
-  else if (Number(year) < 2023) key = "historicalYearNote";
-  note.hidden = !key;
-  if (key) note.textContent = t(key);
-}
-
-function rescalePointDependentMetrics() {
-  for (const key of ["championship_points", "points_per_start", "team_points_share"]) {
-    const values = state.dataset.drivers.map((driver) => driver[key]).filter((value) => Number.isFinite(value));
-    const low = Math.min(...values);
-    const high = Math.max(...values);
-    state.dataset.drivers.forEach((driver) => {
-      const value = driver[key];
-      driver.normalised[key] = Number.isFinite(value) ? (low === high ? 1 : (value - low) / (high - low)) : null;
-    });
-  }
-}
-
-function applyPointsMode() {
-  if (!state.dataset) return;
-  const years = state.dataset.years || [];
-  for (const driver of state.dataset.drivers) {
-    driver._historicalPoints ??= {
-      championship_points: driver.championship_points,
-      points_per_start: driver.points_per_start,
-      normalised_points: driver.normalised.championship_points,
-      normalised_per_start: driver.normalised.points_per_start,
-      team_points_share: driver.team_points_share,
-      normalised_team_share: driver.normalised.team_points_share
-    };
-    if (state.pointsMode === "current") {
-      const total = years.reduce((sum, year) => sum + (state.currentPoints.points_by_driver_season[`${driver.driver_id}:${year}`] || 0), 0);
-      driver.championship_points = total;
-      driver.points_per_start = driver.race_starts > 0 ? total / driver.race_starts : null;
-      driver.team_points_share = driver._team_points_share_current;
-    } else {
-      driver.championship_points = driver._historicalPoints.championship_points;
-      driver.points_per_start = driver._historicalPoints.points_per_start;
-      driver.team_points_share = driver._historicalPoints.team_points_share;
-      driver.normalised.championship_points = driver._historicalPoints.normalised_points;
-      driver.normalised.points_per_start = driver._historicalPoints.normalised_per_start;
-      driver.normalised.team_points_share = driver._historicalPoints.normalised_team_share;
-    }
-  }
-  if (state.pointsMode === "current") rescalePointDependentMetrics();
-  $("#points-mode").checked = state.pointsMode === "current";
-  $("#points-mode-note").hidden = state.pointsMode !== "current";
-}
-
-async function setPointsMode(enabled) {
-  if (enabled && !state.currentPoints) {
-    const response = await fetch("./data/current_points.json");
-    if (!response.ok) throw new Error("Current-rules points data is unavailable");
-    state.currentPoints = await response.json();
-  }
-  state.pointsMode = enabled ? "current" : "historical";
-  applyPointsMode();
-  window.APEX_INVERSE.invalidate();
-  if (state.dataset) {
-    state.previousRanks.clear();
-    state.comparisonDirty = true;
-    renderAll();
-  }
+function updateSeasonNote(selection) {
+  const bounds = selectionBounds(selection);
+  if (!bounds) return;
+  const period = bounds[0] === bounds[1] ? String(bounds[0]) : `${bounds[0]}–${bounds[1]}`;
+  const button = $("#period-toggle");
+  let label = button.querySelector('.period-label');
+  if (!label) { label = document.createElement('span'); label.className = 'period-label'; button.append(label); }
+  label.textContent = period;
+  button.title = `${t("yearRange")}: ${period}`;
+  button.setAttribute('aria-label', button.title);
 }
 
 function escapeHTML(value) {
@@ -177,6 +102,15 @@ function escapeHTML(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function studioIcon(name, className = "studio-icon") {
+  return `<svg class="${className}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="./assets/studio/icons.svg#${name}"></use></svg>`;
+}
+
+function rankLabel(rank) {
+  const number = String(rank).padStart(2, "0");
+  return rank <= 3 ? `<span class="rank-medal rank-medal-${rank}"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="./assets/studio/icons.svg#medal"></use></svg><span>${number}</span></span>` : number;
 }
 
 function metricName(key) {
@@ -189,7 +123,7 @@ function metricDescription(key) {
   return LOCALES[state.language]?.metrics[index]?.[1] || "";
 }
 
-function presetLabel(key) { return LOCALES[state.language]?.presets[key] || key; }
+function presetLabel(key) { return PRESETS[key]?.label?.[state.language] || PRESETS[key]?.label?.en || key; }
 
 function formatWeight(value) { return String(Math.round(Number(value) * 10) / 10); }
 
@@ -245,6 +179,7 @@ function prepareDataset() {
 function resetDriverFilters({render = true} = {}) {
   state.search = "";
   state.filters = {team: "all", country: "all", era: "all", achievement: "all", minStarts: 0};
+  state.page = 0;
   state.visibleLimit = INITIAL_RENDER_LIMIT;
   if ($("#driver-search")) $("#driver-search").value = "";
   if ($("#team-filter")) $("#team-filter").value = "all";
@@ -349,12 +284,23 @@ function driverPortrait(driver, detail = false) {
   return `<span class="driver-portrait ${detail ? "portrait-large" : ""}"><span class="portrait-fallback">${fallback}</span>${source ? `<img src="${escapeHTML(source)}" alt="" loading="lazy" decoding="async">` : ""}</span>`;
 }
 
+function nationalityFlag(driver) {
+  const region = COUNTRY_REGIONS[driver.country_code];
+  return region ? `<img class="nationality-flag" src="./assets/identity/flag-${region.toLowerCase()}.svg" alt="${escapeHTML(countryName(driver.country_code))}" title="${escapeHTML(countryName(driver.country_code))}" width="20" height="15">` : "";
+}
+function teamBadge(driver) {
+  const team = driver.team_name || t("teamFallback");
+  const mark = TEAM_MARKS[team];
+  return mark ? `<img class="team-mark" src="./assets/identity/${mark}.webp" alt="${escapeHTML(team)}" title="${escapeHTML(team)}" width="28" height="20">` : `<span class="team-fallback" title="${escapeHTML(team)}">${escapeHTML(team)}</span>`;
+}
+function driverIdentity(driver) { return nationalityFlag(driver) + teamBadge(driver); }
+
 function driverCell(driver) {
   const expanded = state.expandedDrivers.has(driverKey(driver));
   const profileUrl = safeExternalUrl(driver.profile?.profile_url);
   const name = escapeHTML(driver.full_name);
   const link = profileUrl ? `<a href="${escapeHTML(profileUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHTML(t("openProfile", {name: driver.full_name}))}">${name}<span aria-hidden="true">↗</span></a>` : name;
-  return `<div class="driver-cell"><button class="driver-expand" type="button" data-expand-driver="${driverKey(driver)}" aria-expanded="${expanded}" aria-label="${escapeHTML(t(expanded ? "collapseDriver" : "expandDriver", {name: driver.full_name}))}"><span aria-hidden="true">▾</span></button>${driverPortrait(driver)}<span class="driver-info"><strong>${link}</strong><small>${escapeHTML(driver.team_name || t("teamFallback"))}</small></span></div>`;
+  return `<div class="driver-cell"><button class="driver-drag" type="button" data-drag-driver="${driverKey(driver)}" aria-label="${escapeHTML(t("dragDriver", {name:driver.full_name}))}" title="${escapeHTML(t("dragDriver", {name:driver.full_name}))}">⠿</button><button class="driver-expand" type="button" data-expand-driver="${driverKey(driver)}" aria-expanded="${expanded}" aria-label="${escapeHTML(t(expanded ? "collapseDriver" : "expandDriver", {name: driver.full_name}))}"><span aria-hidden="true">▾</span></button>${driverPortrait(driver)}<span class="driver-info"><strong>${link}</strong><small class="driver-identity">${driverIdentity(driver)}</small></span></div>`;
 }
 
 function driverDetailContent(driver) {
@@ -371,16 +317,73 @@ function driverDetailContent(driver) {
   const usesWikimedia = profile.portrait_source_name === "Wikimedia" || profile.portrait_source_name === "Generated F1 helmet avatar" && profile.wiki_thumbnail_url;
   const portraitSource = t(usesWikimedia ? "portraitSourceWikimedia" : profile.portrait_source_name === "Generated F1 helmet avatar" ? "portraitSourceGenerated" : "portraitSource");
   const carNumber = driver.driver_number !== null && driver.driver_number !== undefined ? ` / #${escapeHTML(driver.driver_number)}` : "";
-  return `<div class="driver-detail-inner" style="--team:#${escapeHTML((driver.team_colour || "777777").replace("#", ""))}">
-      <div class="detail-identity">${driverPortrait(driver, true)}<div><span class="detail-kicker">${escapeHTML(t("profileHeading"))}${carNumber}</span><h4>${escapeHTML(driver.full_name)}</h4><p>${escapeHTML(countryName(driver.country_code))} · ${escapeHTML(driver.team_name || t("teamFallback"))}</p></div></div>
+  return `<div class="driver-detail-inner" ${state.view === "table" ? `role="cell" aria-colspan="${state.dataset.metrics.length + 3}"` : ""} style="--team:#${escapeHTML((driver.team_colour || "777777").replace("#", ""))}">
+      <div class="detail-identity">${driverPortrait(driver, true)}<div><span class="detail-kicker">${carNumber}</span><h4>${escapeHTML(driver.full_name)}</h4><p class="driver-identity">${driverIdentity(driver)}</p></div></div>
       <div class="detail-copy"><p lang="${bio ? "en" : escapeHTML(state.language)}">${escapeHTML(shortBio || t("profileUnavailable"))}</p>${profileUrl ? `<a href="${escapeHTML(profileUrl)}" target="_blank" rel="noopener noreferrer">${escapeHTML(t("visitProfile"))}</a>` : ""}<small>${bio ? `${escapeHTML(t("profileSource"))} · ` : ""}${escapeHTML(portraitSource)}</small></div>
-      <div class="detail-stats">${stats.map(([label, value]) => `<div><strong>${escapeHTML(value ?? "—")}</strong><span>${escapeHTML(t(label))}</span></div>`).join("")}<small>${escapeHTML(t("profileSnapshot", {year: state.dataset.period_label || state.dataset.year}))}</small></div>
+      <div class="detail-stats">${stats.map(([label, value]) => `<div><strong>${escapeHTML(value ?? "—")}</strong><span>${escapeHTML(t(label))}</span></div>`).join("")}</div>
     </div>`;
+}
+
+function bindDriverDragging() {
+  let drag = null, suppressClickUntil = 0;
+  const accept = (id, target, y) => {
+    if (!target?.closest('#inverse-list')) return;
+    const row = target.closest('[data-inverse-index]');
+    const at = row ? Number(row.dataset.inverseIndex) + Number(y > row.getBoundingClientRect().top + row.offsetHeight/2) : undefined;
+    window.APEX_INVERSE.addDriver(id, at);
+  };
+  const clear = () => {
+    drag?.ghost?.remove(); drag = null;
+    document.querySelectorAll('.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
+  };
+  $('#lineup-table').addEventListener('dragstart', event => {
+    const row = event.target.closest('[data-driver]');
+    if (!row || event.target.closest('a,button')) { event.preventDefault(); return; }
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('application/x-apex-driver', row.dataset.driver);
+    if (studioTool !== 'reverse') openStudioTool("reverse");
+  });
+  $('#lineup-table').addEventListener('pointerdown', event => {
+    const handle = event.target.closest('[data-drag-driver]');
+    if (!handle || event.button !== 0) return;
+    event.preventDefault();
+    drag = {id:handle.dataset.dragDriver, x:event.clientX, y:event.clientY, pointer:event.pointerId, moved:false};
+  });
+  document.addEventListener('pointermove', event => {
+    if (!drag || event.pointerId !== drag.pointer) return;
+    if (!drag.moved && Math.hypot(event.clientX-drag.x,event.clientY-drag.y) < 6) return;
+    event.preventDefault();
+    if (!drag.moved) {
+      drag.moved = true;
+      if (studioTool !== 'reverse') openStudioTool("reverse");
+      drag.ghost = document.createElement('div'); drag.ghost.className = 'driver-drag-ghost';
+      drag.ghost.textContent = state.dataset.drivers.find(d => driverKey(d) === drag.id)?.full_name || '';
+      document.body.append(drag.ghost);
+    }
+    drag.ghost.style.left = `${event.clientX+12}px`; drag.ghost.style.top = `${event.clientY+12}px`;
+    document.querySelectorAll('.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
+    document.elementFromPoint(event.clientX,event.clientY)?.closest('#inverse-list')?.classList.add('is-drop-target');
+  }, {passive:false});
+  document.addEventListener('pointerup', event => {
+    if (!drag || event.pointerId !== drag.pointer) return;
+    const id = drag.id;
+    if (drag.moved) accept(id,document.elementFromPoint(event.clientX,event.clientY),event.clientY);
+    else { if (studioTool !== 'reverse') openStudioTool("reverse"); window.APEX_INVERSE.addDriver(id); }
+    suppressClickUntil = performance.now()+300; clear();
+  });
+  document.addEventListener('pointercancel', clear);
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') clear(); });
+  $('#lineup-table').addEventListener('click', event => {
+    const handle = event.target.closest('[data-drag-driver]');
+    if (!handle || performance.now() < suppressClickUntil) return;
+    if (studioTool !== 'reverse') openStudioTool("reverse");
+    window.APEX_INVERSE.addDriver(handle.dataset.dragDriver);
+  });
 }
 
 function driverDetail(driver) {
   const expanded = state.expandedDrivers.has(driverKey(driver));
-  return `<section class="driver-detail ${expanded ? "is-open" : ""}" data-detail-driver="${driverKey(driver)}" aria-label="${escapeHTML(t("profileHeading"))}">${expanded ? driverDetailContent(driver) : ""}</section>`;
+  return `<section class="driver-detail ${expanded ? "is-open" : ""}" data-detail-driver="${driverKey(driver)}" aria-hidden="${!expanded}" ${state.view === "table" ? 'role="row"' : ""} aria-label="${escapeHTML(t("profileHeading"))}">${expanded ? driverDetailContent(driver) : ""}</section>`;
 }
 
 function attributeContribution(driver, metric, weights) {
@@ -391,23 +394,26 @@ function attributeContribution(driver, metric, weights) {
   return denominator > 0 ? Number(normalised) * weight / denominator : 0;
 }
 
+function scoreLabel(driver) { return driver.availableWeight > 0 ? (driver.score * 100).toFixed(1) : "—"; }
+
 function stackedBar(driver, weights, enabled = state.enabled, {small = false} = {}) {
   const rankedDriver = Number.isFinite(driver.availableWeight) ? driver : rankDrivers(weights, enabled).find((item) => driverKey(item) === driverKey(driver));
+  if (!(rankedDriver.availableWeight > 0)) return `<span class="stack-track is-unscored" role="img" aria-label="${escapeHTML(t("missingValue"))}"></span>`;
   const segments = state.dataset.metrics.map((metric, index) => {
     if (enabled[metric.key] === false) return "";
     const contribution = attributeContribution(rankedDriver, metric, weights) * 100;
     if (contribution <= 0) return "";
     const raw = displayValue(metric.key, driver[metric.key]);
     const title = t("contributionTooltip", {name: metricName(metric.key), raw, weight: formatWeight(weights[metric.key] || 0), points: contribution.toFixed(1)});
-    return `<span class="stack-segment" style="width:${contribution.toFixed(3)}%;--segment:${METRIC_COLORS[index % METRIC_COLORS.length]}" title="${escapeHTML(title)}" aria-label="${escapeHTML(title)}"></span>`;
+    return `<span class="stack-segment" data-segment-metric="${metric.key}" style="width:${contribution.toFixed(3)}%;--segment:${metricColor(metric.key)}" title="${escapeHTML(title)}" aria-label="${escapeHTML(title)}"></span>`;
   }).join("");
   const score = clamp(rankedDriver.score * 100, 0, 100).toFixed(2);
-  const car = small ? "" : `<span class="race-car" style="--car-position:${score}%" aria-hidden="true"><svg viewBox="0 0 44 22" focusable="false"><path d="M2 6h6l3 5-3 5H2V6Zm10 3h13l5-4h8v3h-6l-3 3 3 3h6v3h-8l-5-4H12l-3-2 3-2Z" fill="currentColor"/><path d="M16 6h6v3h-6zm0 7h6v3h-6zM32 2h6v5h-6zm0 13h6v5h-6z" fill="#14171b"/><path d="M11 10h16" stroke="#14171b" stroke-width="1.2"/></svg></span>`;
+  const car = small ? "" : `<span class="race-car" style="--car-position:${score}%" aria-hidden="true"><svg viewBox="0 0 96 44" focusable="false"><use href="./assets/studio/icons.svg#race-car"></use></svg></span>`;
   return `<span class="stack-track ${small ? "small" : ""}" role="img" aria-label="${escapeHTML(t("stackAria", {name: driver.full_name, score: (rankedDriver.score * 100).toFixed(1)}))}">${segments}${car}<span class="finish-flag" aria-hidden="true"></span></span>`;
 }
 
 function encodeWeightCode() {
-  const payload = JSON.stringify({v: 2, year: state.dataset?.year, pointsMode: state.pointsMode, weights: state.weights, enabled: Object.keys(state.enabled).filter((key) => state.enabled[key])});
+  const payload = JSON.stringify({v: 2, year: state.dataset?.year, weights: state.weights, enabled: Object.keys(state.enabled).filter((key) => state.enabled[key])});
   const bytes = new TextEncoder().encode(payload);
   let binary = "";
   bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
@@ -436,6 +442,14 @@ function showToast(message) {
   showToast.timer = setTimeout(() => toast.classList.remove("show"), 2300);
 }
 
+function resetWeights({render = true} = {}) {
+  if (!state.dataset) return;
+  state.weights = Object.fromEntries(state.dataset.metrics.map(metric => [metric.key, DEFAULT_METRIC_WEIGHT]));
+  state.enabled = Object.fromEntries(state.dataset.metrics.map(metric => [metric.key, true]));
+  state.activePreset = null;
+  if (render) renderAll();
+}
+
 function applyPreset(key, {render = true} = {}) {
   const preset = PRESETS[key];
   if (!preset || !state.dataset) return;
@@ -446,8 +460,9 @@ function applyPreset(key, {render = true} = {}) {
 }
 
 function renderPresets() {
+  $("#preset-row").hidden = Object.keys(PRESETS).length === 0;
   $("#preset-row").innerHTML = Object.entries(PRESETS).map(([key, preset]) => (
-    `<button class="preset-chip ${state.activePreset === key ? "active" : ""}" data-preset="${key}" type="button">${escapeHTML(presetLabel(key))}</button>`
+    `<button class="preset-chip ${state.activePreset === key ? "active" : ""}" data-tooltip="${escapeHTML(preset.preference + " — " + preset.source)}" data-preset="${key}" type="button">${escapeHTML(presetLabel(key))}</button>`
   )).join("");
   document.querySelectorAll("[data-preset]").forEach((button) => {
     button.addEventListener("click", () => applyPreset(button.dataset.preset));
@@ -456,30 +471,30 @@ function renderPresets() {
 
 function renderWeights() {
   if (!state.dataset) return;
+  const scrollTop = $("#weight-list").scrollTop;
+  const previousValues = new Map([...document.querySelectorAll('[data-weight]')].map(input => [input.dataset.weight, Number(input.value)]));
+  document.querySelectorAll('[data-weight]').forEach(input => cancelAnimationFrame(input.motionFrame));
   $("#weight-list").innerHTML = state.dataset.metrics.map((metric) => {
     const value = formatWeight(state.weights[metric.key] || 0);
     const active = state.enabled[metric.key] !== false;
     const name = escapeHTML(metricName(metric.key));
     return `<div class="weight-control ${active ? "" : "is-disabled"}" data-control-metric="${metric.key}">
-      <div class="weight-label"><button class="weight-enable" type="button" data-toggle-metric="${metric.key}" aria-pressed="${active}" aria-label="${escapeHTML(t(active ? "disableMetric" : "enableMetric", {name: metricName(metric.key)}))}" title="${escapeHTML(t(active ? "disableMetric" : "enableMetric", {name: metricName(metric.key)}))}" style="--segment:${METRIC_COLORS[state.dataset.metrics.indexOf(metric) % METRIC_COLORS.length]}">${active ? "✓" : "+"}</button><label for="weight-number-${metric.key}">${name}</label><input id="weight-number-${metric.key}" data-weight-input="${metric.key}" type="number" min="0" max="${WEIGHT_MAX}" step="${WEIGHT_STEP}" inputmode="decimal" value="${value}" aria-label="${escapeHTML(t("weightInputAria", {name: metricName(metric.key)}))}"><button class="weight-reset" type="button" data-reset-metric="${metric.key}" aria-label="${escapeHTML(t("resetMetric", {name: metricName(metric.key), value: formatWeight(PRESETS.balanced.weights[metric.key] || 0)}))}" title="${escapeHTML(t("resetMetric", {name: metricName(metric.key), value: formatWeight(PRESETS.balanced.weights[metric.key] || 0)}))}">↺</button></div>
-      <small>${escapeHTML(metricDescription(metric.key))}</small>
+      <div class="weight-label"><button class="weight-enable" type="button" data-toggle-metric="${metric.key}" aria-pressed="${active}" aria-label="${escapeHTML(t(active ? "disableMetric" : "enableMetric", {name: metricName(metric.key)}))}" title="${escapeHTML(t(active ? "disableMetric" : "enableMetric", {name: metricName(metric.key)}))}" style="--segment:${metricColor(metric.key)}">${active ? "✓" : "+"}</button><label tabindex="0" data-tooltip="${escapeHTML(metricDescription(metric.key))}" for="weight-number-${metric.key}">${name}</label><input id="weight-number-${metric.key}" data-weight-input="${metric.key}" type="number" min="0" max="${WEIGHT_MAX}" step="${WEIGHT_STEP}" inputmode="decimal" value="${value}" aria-label="${escapeHTML(t("weightInputAria", {name: metricName(metric.key)}))}"><button class="weight-reset" type="button" data-reset-metric="${metric.key}" aria-label="${escapeHTML(t("resetMetric", {name: metricName(metric.key), value: formatWeight(DEFAULT_METRIC_WEIGHT)}))}" title="${escapeHTML(t("resetMetric", {name: metricName(metric.key), value: formatWeight(DEFAULT_METRIC_WEIGHT)}))}">${studioIcon("reset")}</button></div>
+
       <input id="weight-${metric.key}" data-weight="${metric.key}" type="range" min="0" max="${WEIGHT_MAX}" step="${WEIGHT_STEP}" value="${value}" aria-label="${escapeHTML(t("weightAria", {name: metricName(metric.key)}))}">
     </div>`;
   }).join("");
-  renderWeightValuesOnly();
+  renderWeightValuesOnly(previousValues);
+  $("#weight-list").scrollTop = scrollTop;
 }
 
-function renderWeightValuesOnly() {
-  const total = Object.entries(state.weights).reduce((sum, [key, value]) => sum + (state.enabled[key] === false ? 0 : Number(value || 0)), 0);
-  $("#weight-total").textContent = formatWeight(total);
-  $("#weight-gauge").parentElement.style.setProperty("--gauge", `${clamp(total / (Math.max(1, state.dataset.metrics.length) * WEIGHT_MAX) * 100, 0, 100)}%`);
-  $("#weight-help").textContent = Object.values(state.enabled).some(Boolean) ? t("weightHelp") : t("noActiveMetrics");
+function renderWeightValuesOnly(previousValues = null) {
   document.querySelectorAll("[data-weight]").forEach((input) => {
     const key = input.dataset.weight;
     const control = input.closest(".weight-control");
     const value = formatWeight(state.weights[key] || 0);
     const active = state.enabled[key] !== false;
-    if (document.activeElement !== input) input.value = value;
+    window.APEX_MOTION.slider(input, Number(value), previousValues?.get(key) ?? Number(input.value), document.activeElement !== input);
     const numberInput = control.querySelector("[data-weight-input]");
     if (document.activeElement !== numberInput) numberInput.value = value;
     control.classList.toggle("is-disabled", !active);
@@ -493,9 +508,11 @@ function renderWeightValuesOnly() {
 
 function toggleMetric(key) {
   if (!state.dataset.metrics.some((metric) => metric.key === key)) return;
+  const restoreToggleFocus = document.activeElement?.matches(".metric-mini");
   state.enabled[key] = state.enabled[key] === false;
   state.activePreset = null;
   renderAll({preserveWeightDOM: true});
+  if (restoreToggleFocus) document.querySelector(`.metric-mini[data-toggle-metric="${key}"]`)?.focus({preventScroll:true});
 }
 
 function updateWeight(key, rawValue) {
@@ -511,7 +528,7 @@ function updateWeight(key, rawValue) {
 
 function resetMetric(key) {
   if (!state.dataset.metrics.some((metric) => metric.key === key)) return;
-  state.weights[key] = Number(PRESETS.balanced.weights[key] || 0);
+  state.weights[key] = DEFAULT_METRIC_WEIGHT;
   state.activePreset = null;
   renderAll({preserveWeightDOM: true});
 }
@@ -519,63 +536,69 @@ function resetMetric(key) {
 function renderLineUp({animate = true} = {}) {
   if (!state.dataset) return;
   const table = $("#lineup-table");
-  const previousPositions = animate ? new Map([...table.querySelectorAll(".lineup-row[data-driver]")].map((row) => [row.dataset.driver, row.getBoundingClientRect().top])) : new Map();
-  const previousRanks = state.previousRanks;
+  const viewport = $("#lineup-scroll");
+  const scrollTop = viewport.scrollTop;
+  const legendScrollLeft = table.querySelector(".metric-mini-row")?.scrollLeft || 0;
+  const before = window.APEX_MOTION.snapshot(viewport, '.lineup-row[data-driver]', 'data-driver');
   state.ranked = rankDrivers(state.weights);
   state.filteredRanked = filteredRanking(state.ranked);
+  syncActiveScenario();
   const visibleDrivers = state.filteredRanked.slice(0, state.visibleLimit);
+  $("#page-status").textContent = `${state.filteredRanked.length} / ${state.dataset.drivers.length}`;
+  const setup = state.scenarios.find(s => s.id === state.activeScenario);
+  const changes = setup ? window.APEX_MOTION.history(setup, state.ranked, driverKey, state.dataset.year) : new Map();
   const rankPositions = new Map(state.ranked.map((driver, index) => [driverKey(driver), index + 1]));
   const metrics = state.dataset.metrics;
   const rowInfo = (driver) => {
     const rank = rankPositions.get(driverKey(driver));
-    const previousRank = previousRanks.get(driverKey(driver));
-    const change = previousRank === undefined ? 0 : previousRank - rank;
+    const change = driver.availableWeight > 0 ? changes.get(driverKey(driver)) || 0 : 0;
     const changeClass = change > 0 ? "rank-up" : change < 0 ? "rank-down" : "";
     const team = `#${(driver.team_colour || "777777").replace("#", "")}`;
     return {rank, change, changeClass, team};
   };
   let header = "";
   let rows = "";
-  if (state.view === "stacked") {
+  if (state.view !== "table") {
     const totalWeight = Math.max(1, metrics.reduce((sum, metric) => sum + (state.enabled[metric.key] === false ? 0 : Number(state.weights[metric.key] || 0)), 0));
     const histograms = metrics.map((metric, index) => {
       const active = state.enabled[metric.key] !== false;
       const bins = state.metricHistograms.get(metric.key) || Array(8).fill(0);
       const max = Math.max(1, ...bins);
-      const spark = bins.map((count) => `<i style="height:${Math.max(8, count / max * 100)}%;--segment:${METRIC_COLORS[index % METRIC_COLORS.length]}"></i>`).join("");
-      return `<button class="metric-mini ${active ? "" : "is-disabled"}" type="button" data-toggle-metric="${metric.key}" aria-pressed="${active}" aria-label="${escapeHTML(t(active ? "disableMetric" : "enableMetric", {name: metricName(metric.key)}))}" title="${escapeHTML(metricDescription(metric.key))}"><span><i style="--segment:${METRIC_COLORS[index % METRIC_COLORS.length]}"></i>${escapeHTML(metricName(metric.key))}</span><strong>${active ? `${Math.round((Number(state.weights[metric.key] || 0) / totalWeight) * 100)}%` : escapeHTML(t("metricOff"))}</strong><span class="metric-hist">${spark}</span></button>`;
+      const spark = bins.map((count) => `<i style="height:${count / max * 100}%;--segment:${metricColor(metric.key)}"></i>`).join("");
+      return `<button class="metric-mini ${active ? "" : "is-disabled"}" type="button" data-toggle-metric="${metric.key}" aria-pressed="${active}" aria-label="${escapeHTML(t(active ? "disableMetric" : "enableMetric", {name: metricName(metric.key)}))}" title="${escapeHTML(metricName(metric.key) + ": " + metricDescription(metric.key) + " · " + t("histogramMeaning"))}"><span><i style="--segment:${metricColor(metric.key)}"></i>${escapeHTML(metricName(metric.key))}</span><strong>${active ? `${Math.round((Number(state.weights[metric.key] || 0) / totalWeight) * 100)}%` : escapeHTML(t("metricOff"))}</strong><span class="metric-hist" aria-hidden="true">${spark}</span></button>`;
     }).join("");
-    header = `<div class="stacked-header"><div class="stacked-title"><span>${escapeHTML(t("rankDriver"))}</span><strong>${escapeHTML(t("combinedScore"))}</strong><span>0 — 100</span></div><div class="metric-mini-row">${histograms}</div></div>`;
+    header = `<div class="stacked-header"><div class="metric-mini-row">${histograms}</div><div class="stacked-title"><span>${escapeHTML(t("rankDriver"))}</span><strong tabindex="0" data-tooltip="${escapeHTML(t("scoreMeaning"))}">${escapeHTML(t("scoreColumn"))}</strong><span>0 — 100</span></div></div>`;
     rows = visibleDrivers.map((driver) => {
       const info = rowInfo(driver);
-      return `<div class="lineup-row stacked-row ${info.rank <= 3 ? "podium-row" : ""} ${info.changeClass}" data-driver="${driverKey(driver)}" style="--team:${info.team}"><div class="rank-cell">${String(info.rank).padStart(2, "0")}</div>${driverCell(driver)}<div class="stack-cell">${stackedBar(driver, state.weights, state.enabled)}</div><div class="stack-score"><strong>${(driver.score * 100).toFixed(1)}</strong><small>${info.change > 0 ? `▲${info.change}` : info.change < 0 ? `▼${-info.change}` : " /100"}</small></div></div>${driverDetail(driver)}`;
+      return `<div class="lineup-row stacked-row ${info.rank <= 3 ? "podium-row" : ""} ${info.changeClass}" data-driver="${driverKey(driver)}" draggable="true" style="--team:${info.team}"><div class="rank-cell">${driver.availableWeight > 0 ? rankLabel(info.rank) : "—"}</div>${driverCell(driver)}<div class="stack-cell">${stackedBar(driver, state.weights, state.enabled)}</div><div class="stack-score"><strong>${scoreLabel(driver)}</strong><small>${info.change > 0 ? `▲${info.change}` : info.change < 0 ? `▼${-info.change}` : " /100"}</small></div></div>${driverDetail(driver)}`;
     }).join("");
   } else {
-    const maxWeight = Math.max(1, ...metrics.map((metric) => state.enabled[metric.key] === false ? 0 : Number(state.weights[metric.key] || 0)));
-    const columns = metrics.map((metric) => `${Math.round(92 + 76 * ((state.enabled[metric.key] === false ? 0 : Number(state.weights[metric.key] || 0)) / maxWeight))}px`);
-    const template = `52px 196px 132px ${columns.join(" ")}`;
-    header = `<div class="lineup-row header" style="grid-template-columns:${template}"><div>#</div><div>${escapeHTML(t("driverTeamColumn"))}</div><div>${escapeHTML(t("scoreColumn"))}</div>${metrics.map((metric) => `<div class="${state.enabled[metric.key] === false ? "metric-disabled" : ""}" title="${escapeHTML(metricDescription(metric.key))}">${escapeHTML(metricName(metric.key))} · ${escapeHTML(t("weightPrefix"))}${state.enabled[metric.key] === false ? escapeHTML(t("metricOff")) : formatWeight(state.weights[metric.key] || 0)}</div>`).join("")}</div>`;
+    const columns = metrics.map(() => "minmax(112px, 1fr)");
+    const template = `44px 230px 100px ${columns.join(" ")}`;
+    header = `<div class="lineup-row header" style="grid-template-columns:${template}"><div>#</div><div>${escapeHTML(t("driverTeamColumn"))}</div><div>${escapeHTML(t("scoreColumn"))}</div>${metrics.map((metric) => `<div class="metric-heading ${state.enabled[metric.key] === false ? "metric-disabled" : ""}" style="--segment:${metricColor(metric.key)}" tabindex="0" data-tooltip="${escapeHTML(metricDescription(metric.key) + " · " + t("normalizedMeaning"))}">${escapeHTML(metricName(metric.key))} · ${escapeHTML(t("weightPrefix"))}${state.enabled[metric.key] === false ? escapeHTML(t("metricOff")) : formatWeight(state.weights[metric.key] || 0)}</div>`).join("")}</div>`;
     rows = visibleDrivers.map((driver) => {
       const info = rowInfo(driver);
-      return `<div class="lineup-row ${info.rank <= 3 ? "podium-row" : ""} ${info.changeClass}" data-driver="${driverKey(driver)}" style="grid-template-columns:${template};--team:${info.team}"><div class="rank-cell">${String(info.rank).padStart(2, "0")}</div>${driverCell(driver)}<div class="score-cell"><strong>${(driver.score * 100).toFixed(1)}</strong><small>/100</small><span class="score-track"><i style="--score:${(driver.score * 100).toFixed(2)}%"></i></span></div>${metrics.map((metric) => { const normalized = driver.normalised?.[metric.key]; const bar = normalized == null ? 0 : Number(normalized) * 100; const opacity = .2 + .8 * (Number(state.weights[metric.key] || 0) / maxWeight); return `<div class="metric-cell ${state.enabled[metric.key] === false ? "metric-disabled" : ""}" title="${escapeHTML(metricDescription(metric.key))}"><span>${displayValue(metric.key, driver[metric.key])}</span><span class="metric-track"><i style="--bar:${bar.toFixed(2)}%;--opacity:${opacity.toFixed(2)}"></i></span></div>`; }).join("")}</div>${driverDetail(driver)}`;
+      return `<div class="lineup-row ${info.rank <= 3 ? "podium-row" : ""} ${info.changeClass}" data-driver="${driverKey(driver)}" draggable="true" style="grid-template-columns:${template};--team:${info.team}"><div class="rank-cell">${driver.availableWeight > 0 ? rankLabel(info.rank) : "—"}</div>${driverCell(driver)}<div class="score-cell"><strong>${scoreLabel(driver)}</strong><small>${info.change > 0 ? `▲${info.change}` : info.change < 0 ? `▼${-info.change}` : "/100"}</small><span class="score-track"><i style="--score:${(driver.score * 100).toFixed(2)}%"></i></span></div>${metrics.map((metric) => { const normalized = driver.normalised?.[metric.key]; const missing = normalized == null || !Number.isFinite(Number(normalized)); const bar = missing ? 0 : Number(normalized) * 100; return `<div class="metric-cell ${missing ? "is-missing" : ""} ${state.enabled[metric.key] === false ? "metric-disabled" : ""}" data-metric="${metric.key}" style="--segment:${metricColor(metric.key)}" title="${escapeHTML(metricName(metric.key) + ": " + displayValue(metric.key, driver[metric.key]) + " · " + (missing ? t("missingValue") : t("normalizedValue", {value:bar.toFixed(1)})))}"><span>${displayValue(metric.key, driver[metric.key])}</span><span class="metric-track"><i style="--bar:${bar.toFixed(2)}%;--opacity:1"></i></span></div>`; }).join("")}</div>${driverDetail(driver)}`;
     }).join("");
   }
-  const remaining = Math.max(0, state.filteredRanked.length - visibleDrivers.length);
-  const loadMore = remaining ? `<div class="lineup-load-more"><span>${escapeHTML(t("resultsShown", {shown: visibleDrivers.length, total: state.filteredRanked.length}))}</span><button type="button" data-load-more>${escapeHTML(t("loadMore", {count: Math.min(RENDER_BATCH, remaining)}))}</button></div>` : `<div class="lineup-load-more complete"><span>${escapeHTML(t("resultsShown", {shown: visibleDrivers.length, total: state.filteredRanked.length}))}</span></div>`;
-  table.innerHTML = header + rows + loadMore;
-  table.classList.toggle("stacked-mode", state.view === "stacked");
-  table.classList.toggle("compact", state.compact);
-  table.style.zoom = String(state.zoom.lineup);
+  // The document stays fixed; only the driver pane scrolls.
+  table.innerHTML = header + (visibleDrivers.length ? rows : `<div class="ranking-empty" role="status">${escapeHTML(t("inverseNoResults"))}</div>`);
+  if (state.view === "table") {
+    table.setAttribute("role", "table");
+    table.setAttribute("aria-label", t("tableView"));
+    table.querySelectorAll(".lineup-row").forEach(row => {
+      row.setAttribute("role", "row");
+      [...row.children].forEach(cell => cell.setAttribute("role", row.classList.contains("header") ? "columnheader" : "cell"));
+    });
+  } else { table.removeAttribute("role"); table.removeAttribute("aria-label"); }
+  table.classList.toggle("stacked-mode", state.view !== "table");
+  table.style.minWidth = state.view === "table" ? `${374 + metrics.length * 112}px` : "";
   updateFilterStatus(state.filteredRanked.length, visibleDrivers.length);
   state.previousRanks = rankPositions;
-  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches && previousPositions.size) {
-    requestAnimationFrame(() => table.querySelectorAll(".lineup-row[data-driver]").forEach((row) => {
-      const before = previousPositions.get(row.dataset.driver);
-      if (before === undefined) return;
-      const offset = before - row.getBoundingClientRect().top;
-      if (Math.abs(offset) > 1 && Math.abs(offset) < 1600) row.animate([{transform: `translateY(${offset}px)`, zIndex: 2}, {transform: "translateY(0)", zIndex: 1}], {duration: 500, easing: "cubic-bezier(.22,.7,.2,1)"});
-    }));
-  }
+  viewport.scrollTop = scrollTop;
+  if (table.querySelector(".metric-mini-row")) table.querySelector(".metric-mini-row").scrollLeft = legendScrollLeft;
+  window.APEX_MOTION.animate(viewport, ".lineup-row[data-driver]", "data-driver", before, animate);
+
 }
 
 function frozenScenario(name, weights, colorIndex, enabled = state.enabled, presetKey = null) {
@@ -590,32 +613,15 @@ function scenarioRanking(scenario) {
 }
 
 function initialiseScenarios() {
-  state.scenarios = [
-    frozenScenario("", PRESETS.balanced.weights, 0, state.enabled, "balanced"),
-    frozenScenario("", PRESETS.pace.weights, 1, state.enabled, "pace"),
-    frozenScenario("", PRESETS.racecraft.weights, 2, state.enabled, "racecraft")
-  ];
+  const scenario = frozenScenario(t("customScenario", {number:1}), state.weights, 0, state.enabled);
+  state.scenarios = [scenario];
+  state.activeScenario = scenario.id;
+  $("#setup-name").value = scenario.name;
+  state.page = 0;
+  setOverview(false);
 }
 
-function renderScenarios() {
-  const list = $("#scenario-list");
-  list.innerHTML = state.scenarios.map((scenario, index) => {
-    const top = scenarioRanking(scenario)[0];
-    const name = scenarioName(scenario);
-    return `<article class="scenario-card" style="--scenario:${scenario.color}">
-      <strong>${escapeHTML(name)}</strong>
-      <small>${escapeHTML(t("scenarioSummary", {driver: top?.name_acronym || "—", score: (top?.score * 100 || 0).toFixed(1)}))}</small>
-      <button data-remove-scenario="${escapeHTML(scenario.id)}" type="button" aria-label="${escapeHTML(t("scenarioRemove", {name}))}">×</button>
-    </article>`;
-  }).join("");
-  document.querySelectorAll("[data-remove-scenario]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.scenarios = state.scenarios.filter((scenario) => scenario.id !== button.dataset.removeScenario);
-      renderScenarios();
-      requestComparisonRender();
-    });
-  });
-}
+function renderScenarios() { syncActiveScenario(); }
 
 function svgElement(name, attributes = {}, text = null) {
   const element = document.createElementNS("http://www.w3.org/2000/svg", name);
@@ -634,63 +640,110 @@ function requestComparisonRender({force = false} = {}) {
   const run = () => {
     state.comparisonTask = 0;
     if (!state.comparisonDirty) return;
-    renderComparison();
-    state.comparisonDirty = false;
+    if (renderComparison() !== false) state.comparisonDirty = false;
   };
   state.comparisonTask = "requestIdleCallback" in window ? window.requestIdleCallback(run, {timeout: 350}) : window.setTimeout(run, 30);
 }
 
 function renderComparison() {
-  const container = $("#comparison-chart");
-  if (!state.dataset || state.scenarios.length < 2) {
-    container.innerHTML = `<div class="empty-chart">${escapeHTML(t("comparisonNeedTwo"))}</div>`;
-    return;
-  }
-  $("#comparison-metric-legend").innerHTML = state.dataset.metrics.map((metric, index) => `<span class="metric-legend" title="${escapeHTML(metricDescription(metric.key))}"><i style="--segment:${METRIC_COLORS[index % METRIC_COLORS.length]}"></i>${escapeHTML(metricName(metric.key))}</span>`).join("");
+  const container = $('#comparison-chart');
+  if (container.querySelector('.scenario-rename')) return false;
+  if (!state.dataset || state.scenarios.length < 2) { container.replaceChildren(); return; }
+  const previous = new Map([...container.querySelectorAll('.comparison-column')].map(column => {
+    const list = column.querySelector('.comparison-rows');
+    return [column.dataset.scenario, {scrollTop:list.scrollTop, snapshot:window.APEX_MOTION.snapshot(list, '.compare-row', 'data-flow-driver')}];
+  }));
+  state.scenarios.forEach(setup => { if (!previous.has(setup.id) && setup.seedMotion?.size) previous.set(setup.id, {scrollTop:0, snapshot:setup.seedMotion}); delete setup.seedMotion; });
   const rankings = state.scenarios.map(scenarioRanking);
   const filteredRankings = rankings.map(filteredRanking);
-  if (!filteredRankings[0].length) {
-    container.innerHTML = `<div class="empty-chart">${escapeHTML(t("resultsShown", {shown: 0, total: 0}))}</div>`;
-    return;
-  }
-  const columnWidth = 350;
-  const gap = 76;
-  const headerHeight = 88;
-  const rowHeight = state.compact ? 26 : 31;
+  const columnWidth = 350, gap = 76, headerHeight = 48;
+  const rowHeight = 32;
+  const listHeight = Math.min(480, Math.max(140, container.clientHeight - 156));
+  const height = headerHeight + listHeight;
   const width = state.scenarios.length * columnWidth + (state.scenarios.length - 1) * gap;
-  const height = headerHeight + rowHeight * filteredRankings[0].length;
-  const rankMaps = rankings.map((ranking) => new Map(ranking.map((driver, index) => [driverKey(driver), index])));
-  const columns = filteredRankings.map((ranking, scenarioIndex) => {
-    const scenario = state.scenarios[scenarioIndex];
-    const name = scenarioName(scenario);
-    const rows = ranking.map((driver) => { const rank = rankMaps[scenarioIndex].get(driverKey(driver)) + 1; return `<div class="compare-row" data-flow-driver="${driverKey(driver)}" style="--team:#${(driver.team_colour || "777777").replace("#", "")}" title="${escapeHTML(t("comparisonRowTooltip", {name: driver.full_name, rank, score: (driver.score * 100).toFixed(1)}))}"><span class="compare-rank">${rank}</span><span class="compare-driver">${escapeHTML(driver.name_acronym || driver.driver_number)}</span>${stackedBar(driver, scenario.weights, scenario.enabled, {small: true})}<strong>${(driver.score * 100).toFixed(1)}</strong></div>`; }).join("");
-    return `<section class="comparison-column" style="left:${scenarioIndex * (columnWidth + gap)}px;--scenario:${scenario.color}" aria-label="${escapeHTML(t("comparisonRankAria", {name}))}"><div class="comparison-column-head"><div><span>SETUP ${String(scenarioIndex + 1).padStart(2, "0")}</span><strong>${escapeHTML(name)}</strong></div><small>${escapeHTML(t("scenarioSummary", {driver: ranking[0]?.name_acronym || "—", score: (ranking[0]?.score * 100 || 0).toFixed(1)}))}</small></div>${rows}</section>`;
-  }).join("");
-  const displayMaps = filteredRankings.map((ranking) => new Map(ranking.map((driver, index) => [driverKey(driver), index])));
-  const svg = svgElement("svg", {viewBox: `0 0 ${width} ${height}`, width, height, class: "comparison-links", role: "img", "aria-label": t("comparisonFlowAria")});
-  filteredRankings[0].forEach((driver) => {
-    const color = `#${(driver.team_colour || "777777").replace("#", "")}`;
-    for (let index = 0; index < state.scenarios.length - 1; index += 1) {
-      const start = (index + 1) * columnWidth + index * gap;
-      const end = start + gap;
-      const y1 = headerHeight + (displayMaps[index].get(driverKey(driver)) + .5) * rowHeight;
-      const y2 = headerHeight + (displayMaps[index + 1].get(driverKey(driver)) + .5) * rowHeight;
-      const path = svgElement("path", {d: `M ${start} ${y1} C ${start + gap * .42} ${y1}, ${end - gap * .42} ${y2}, ${end} ${y2}`, class: "driver-flow", style: `--flow:${color}`, "data-flow-driver": driverKey(driver)});
-      svg.appendChild(path);
-    }
-  });
-  container.innerHTML = `<div class="comparison-board" style="width:${width}px;height:${height}px;--compare-row-height:${rowHeight}px"></div>`;
+  const rankMaps = rankings.map(ranking => new Map(ranking.map((driver, i) => [driverKey(driver), i + 1])));
+  const columns = filteredRankings.map((ranking, index) => {
+    const scenario = state.scenarios[index], name = scenarioName(scenario);
+    const changes = window.APEX_MOTION.history(scenario, rankings[index], driverKey, state.dataset.year);
+    const rows = ranking.slice(0, scenario.visibleLimit || INITIAL_RENDER_LIMIT).map(driver => {
+      const key = driverKey(driver), rank = rankMaps[index].get(key), change = driver.availableWeight > 0 ? changes.get(key) || 0 : 0;
+      const direction = change > 0 ? 'rank-up' : change < 0 ? 'rank-down' : '';
+      const delta = change > 0 ? `▲${change}` : change < 0 ? `▼${-change}` : '';
+      return `<div class="compare-row ${direction}" data-flow-driver="${key}" style="--team:#${(driver.team_colour || '777777').replace('#','')}" title="${escapeHTML(t('comparisonRowTooltip',{name:driver.full_name,rank:driver.availableWeight > 0 ? rank : "—",score:scoreLabel(driver)}))}"><span class="compare-rank">${driver.availableWeight > 0 ? rank : "—"}</span><span class="compare-driver">${escapeHTML(driver.name_acronym || driver.driver_number)}</span>${stackedBar(driver,scenario.weights,scenario.enabled,{small:true})}<span class="comparison-score"><strong>${scoreLabel(driver)}</strong><small>${delta}</small></span></div>`;
+    }).join('');
+    return `<section class="comparison-column" data-scenario="${scenario.id}" style="left:${index*(columnWidth+gap)}px;height:${height}px;--scenario:${scenario.color};view-transition-name:${scenario.id===state.activeScenario?'ranking-focus':'none'}" aria-label="${escapeHTML(t('comparisonRankAria',{name}))}"><div class="comparison-column-head">${studioIcon("flag", "column-flag")}<strong class="scenario-title" data-rename-scenario="${scenario.id}" tabindex="0" role="button" title="${escapeHTML(name)}">${escapeHTML(name)}</strong><div class="column-actions"><button data-expand-scenario="${scenario.id}" title="${escapeHTML(t('lineupTitle'))}" aria-label="${escapeHTML(t('lineupTitle'))}">${studioIcon("expand")}</button><button data-delete-scenario="${scenario.id}" title="${escapeHTML(t('scenarioRemove',{name}))}" aria-label="${escapeHTML(t('scenarioRemove',{name}))}">${studioIcon("close")}</button></div></div><div class="comparison-rows" tabindex="0" aria-label="${escapeHTML(t('comparisonRankAria',{name}))}" style="height:${listHeight}px">${rows || `<div class="empty-chart">${escapeHTML(t('resultsShown',{shown:0,total:0}))}</div>`}</div></section>`;
+  }).join('');
+  container.innerHTML = `<div class="comparison-board" style="width:${width}px;height:${height}px;--compare-row-height:${rowHeight}px">${columns}</div>`;
   const board = container.firstElementChild;
-  board.appendChild(svg);
-  board.insertAdjacentHTML("beforeend", columns);
   board.style.zoom = String(state.zoom.compare);
-  board.addEventListener("mouseover", (event) => {
-    const row = event.target.closest(".compare-row");
-    if (row && !row.contains(event.relatedTarget)) focusFlow(row.dataset.flowDriver, true);
+  const svg = svgElement('svg', {viewBox:`0 0 ${width} ${height}`,width,height,class:'comparison-links',role:'img','aria-label':t('comparisonFlowAria')});
+  board.prepend(svg);
+  const lists = [...board.querySelectorAll('.comparison-rows')];
+  lists.forEach((list,index) => { state.scenarios[index].loadPending = false; list.scrollTop = previous.get(state.scenarios[index].id)?.scrollTop || 0; });
+  const displayMaps = filteredRankings.map(ranking => new Map(ranking.map((driver,i) => [driverKey(driver),i])));
+  const motionStart = performance.now();
+  let linksAnimating = previous.size > 0 && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const drawLinks = () => {
+    const progress = linksAnimating ? Math.min(1, (performance.now() - motionStart) / 460) : 1;
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const position = (index, key) => {
+      const target = displayMaps[index].get(key) * rowHeight;
+      const from = previous.get(state.scenarios[index].id)?.snapshot.get(key)?.top ?? target;
+      return headerHeight + from + (target - from) * eased + rowHeight / 2 - lists[index].scrollTop;
+    };
+    const fragment = document.createDocumentFragment();
+    filteredRankings[0].forEach(driver => {
+      const key = driverKey(driver);
+      for (let index=0; index<lists.length-1; index++) {
+        const start = (index+1)*columnWidth + index*gap, end=start+gap;
+        const y1 = position(index, key);
+        const y2 = position(index+1, key);
+        if (y1<headerHeight || y2<headerHeight || y1>height || y2>height) continue;
+        fragment.appendChild(svgElement('path',{d:`M ${start} ${y1} C ${start+gap*.42} ${y1}, ${end-gap*.42} ${y2}, ${end} ${y2}`,class:'driver-flow',style:'--flow:#8293a6','data-flow-driver':key}));
+      }
+    });
+    svg.replaceChildren(fragment);
+    if (linksAnimating && progress < 1 && board.isConnected) requestAnimationFrame(drawLinks);
+  };
+  let linkFrame = 0;
+  lists.forEach((list,index) => {
+    list.addEventListener('keydown', event => {
+      if (!['ArrowDown','ArrowUp','Home','End'].includes(event.key)) return;
+      event.preventDefault();
+      const rows = [...list.querySelectorAll('.compare-row')];
+      const current = rows.indexOf(document.activeElement);
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : current < 0 ? 0 : clamp(current + (event.key === 'ArrowDown' ? 1 : -1), 0, rows.length - 1);
+      rows[next]?.focus();
+    });
+    list.addEventListener('scroll', () => {
+      linksAnimating = false;
+      const setup = state.scenarios[index];
+      const limit = setup.visibleLimit || INITIAL_RENDER_LIMIT;
+      if (!setup.loadPending && list.scrollTop + list.clientHeight >= list.scrollHeight - 200 && limit < filteredRankings[index].length) {
+        setup.loadPending = true; setup.visibleLimit = limit + RENDER_BATCH; requestComparisonRender();
+      }
+      if (linkFrame) return;
+      linkFrame = requestAnimationFrame(() => { linkFrame=0; drawLinks(); });
+    }, {passive:true});
+    window.APEX_MOTION.animate(list,'.compare-row','data-flow-driver',previous.get(state.scenarios[index].id)?.snapshot || new Map());
   });
-  board.addEventListener("mouseout", (event) => {
-    const row = event.target.closest(".compare-row");
-    if (row && !row.contains(event.relatedTarget)) focusFlow(row.dataset.flowDriver, false);
+  drawLinks();
+  board.querySelectorAll('.compare-row').forEach(row => { row.tabIndex = -1; row.setAttribute('aria-label', row.title); });
+  board.addEventListener('focusin', event => {
+    const row = event.target.closest('.compare-row');
+    if (row) focusFlow(row.dataset.flowDriver,true);
+  });
+  board.addEventListener('focusout', event => {
+    const row = event.target.closest('.compare-row');
+    if (row) focusFlow(row.dataset.flowDriver,false);
+  });
+  board.addEventListener('mouseover', event => {
+    const row = event.target.closest('.compare-row');
+    if (row && !row.contains(event.relatedTarget)) focusFlow(row.dataset.flowDriver,true);
+  });
+  board.addEventListener('mouseout', event => {
+    const row = event.target.closest('.compare-row');
+    if (row && !row.contains(event.relatedTarget)) focusFlow(row.dataset.flowDriver,false);
   });
 }
 
@@ -711,6 +764,7 @@ function scheduleInteractiveRender() {
     state.interactiveFrame = 0;
     renderLineUp();
     renderCode();
+    requestComparisonRender();
   });
 }
 
@@ -720,24 +774,14 @@ function renderAll({preserveWeightDOM = false} = {}) {
   else renderWeights();
   renderLineUp();
   renderCode();
+  requestComparisonRender();
   if (!preserveWeightDOM) {
     renderScenarios();
     requestComparisonRender();
   }
 }
 
-function renderQuality() {
-  const quality = state.metadata?.quality || {};
-  const coverage = Number(quality.coverage_percent || 0);
-  $("#coverage-value").textContent = `${coverage.toFixed(1)}%`;
-  $("#coverage-bar").style.width = `${clamp(coverage, 0, 100)}%`;
-  const notice = $("#data-notice");
-  notice.classList.toggle("complete", Boolean(quality.ok));
-  notice.querySelector("strong").textContent = quality.ok ? t("dataComplete") : t("dataSnapshot", {coverage: coverage.toFixed(2)});
-  notice.querySelector("p").textContent = quality.ok
-    ? t("dataCompleteDetail", {sessions: quality.selected_sessions || 0, drivers: quality.historical_drivers || 0})
-    : t("dataSnapshotDetail", {missing: quality.missing_files || 0});
-}
+function renderQuality() {}
 
 function availableYears() {
   return (state.metadata?.seasons || [])
@@ -761,22 +805,8 @@ function selectionBounds(selection) {
 }
 
 function syncPeriodControls(selection) {
-  const select = $("#season-select");
-  select.querySelector("option[data-custom-range]")?.remove();
-  const value = String(selection);
-  if (/^\d{4}-\d{4}$/.test(value)) {
-    const option = document.createElement("option");
-    option.value = value;
-    option.dataset.customRange = "true";
-    option.textContent = t("customRange", {range: value.replace("-", "–")});
-    select.append(option);
-  }
-  select.value = value;
-  const bounds = selectionBounds(value);
-  if (bounds) {
-    $("#year-from").value = String(bounds[0]);
-    $("#year-to").value = String(bounds[1]);
-  }
+  const bounds = selectionBounds(String(selection));
+  if (bounds) { $("#year-from").value = String(bounds[0]); $("#year-to").value = String(bounds[1]); }
 }
 
 async function applyYearRange() {
@@ -801,18 +831,19 @@ async function loadSeason(year, {resetScenarios = true} = {}) {
   state.expandedDrivers.clear();
   window.APEX_INVERSE.reset();
   state.previousRanks.clear();
+  state.page = 0;
   state.visibleLimit = INITIAL_RENDER_LIMIT;
-  applyPointsMode();
   prepareDataset();
+  state.scenarios.forEach(s => { s.ranking = null; });
   populateFilterOptions();
-  applyPreset("balanced", {render: false});
+  resetWeights({render:false});
   if (resetScenarios) initialiseScenarios();
+  else {
+    const active = state.scenarios.find(s => s.id === state.activeScenario);
+    if (active) { state.weights = {...active.weights}; state.enabled = {...active.enabled}; }
+  }
   state.comparisonDirty = true;
   const seasonInfo = state.metadata.seasons.find((season) => String(season.year) === String(year));
-  $("#driver-count").textContent = state.dataset.drivers.length;
-  $("#race-count").textContent = seasonInfo?.grand_prix_count ?? state.dataset.grand_prix_count ?? "—";
-  $("#metric-count").textContent = state.dataset.metrics.length;
-  $("#season-value").textContent = state.dataset.period_label || year;
   syncPeriodControls(year);
   updateSeasonNote(year);
   renderAll();
@@ -821,14 +852,14 @@ async function loadSeason(year, {resetScenarios = true} = {}) {
 async function importCode() {
   const message = $("#code-message");
   try {
-    const payload = decodeWeightCode($("#weight-code").value);
+    const payload = decodeWeightCode($("#weight-import").value);
     if (payload.year && String(payload.year) !== String(state.dataset.year)) {
-      const option = [...$("#season-select").options].find((item) => item.value === String(payload.year));
+      const option = state.metadata.seasons.find(item => String(item.year) === String(payload.year));
       const range = /^\d{4}-\d{4}$/.test(String(payload.year));
       if (!option && !range) throw new Error(t("importNoSeason", {year: payload.year}));
-      await loadSeason(payload.year);
+      await loadSeason(payload.year, {resetScenarios: false});
     }
-    await setPointsMode(payload.pointsMode === "current");
+
     const validKeys = new Set(state.dataset.metrics.map((metric) => metric.key));
     const imported = {};
     Object.entries(payload.weights).forEach(([key, value]) => {
@@ -841,10 +872,13 @@ async function importCode() {
     state.weights = Object.fromEntries(state.dataset.metrics.map((metric) => [metric.key, imported[metric.key] ?? 0]));
     state.enabled = Object.fromEntries(state.dataset.metrics.map((metric) => [metric.key, payload.v === 1 || payload.enabled.includes(metric.key)]));
     state.activePreset = null;
+    addScenarioFromWeights();
     renderAll();
     message.textContent = t("codeApplied");
     message.style.color = "";
     showToast(t("codeImported"));
+    $("#weight-import").value = "";
+    closeStudioTools();
   } catch (error) {
     message.textContent = error.message;
     message.style.color = "#ff6b7c";
@@ -889,15 +923,15 @@ async function shareSite() {
 
 function setView(view) {
   state.view = view;
-  $("#view-stacked").classList.toggle("active", view === "stacked");
-  $("#view-table").classList.toggle("active", view === "table");
-  $("#view-stacked").setAttribute("aria-pressed", String(view === "stacked"));
-  $("#view-table").setAttribute("aria-pressed", String(view === "table"));
-  renderLineUp();
+  ["stacked", "table"].forEach(key => {
+    $("#view-" + key).classList.toggle("active", key === view);
+    $("#view-" + key).setAttribute("aria-pressed", String(key === view));
+  });
+  renderLineUp({animate:false});
 }
 
 function setZoom(which, value) {
-  state.zoom[which] = clamp(Math.round(value * 10) / 10, .6, 2.4);
+  state.zoom[which] = clamp(value, .02, 3);
   const surface = which === "lineup" ? $("#lineup-table") : $("#comparison-chart .comparison-board");
   if (surface) surface.style.zoom = String(state.zoom[which]);
   document.querySelector(`[data-zoom-controls="${which}"] [data-zoom-value]`).textContent = `${Math.round(state.zoom[which] * 100)}%`;
@@ -918,12 +952,18 @@ function bindViewport(which) {
     scroll.classList.toggle("pan-active", active);
   });
   scroll.addEventListener("wheel", (event) => {
-    if (!event.ctrlKey) return;
+    if (!state.overview || (event.target.closest(".comparison-rows") && !event.ctrlKey)) return;
     event.preventDefault();
-    setZoom(which, state.zoom[which] + (event.deltaY < 0 ? .1 : -.1));
+    const before = state.zoom[which];
+    const bounds = scroll.getBoundingClientRect();
+    const x = event.clientX - bounds.left, y = event.clientY - bounds.top;
+    const left = scroll.scrollLeft, top = scroll.scrollTop;
+    setZoom(which, before * (event.deltaY < 0 ? 1.12 : 1 / 1.12));
+    scroll.scrollLeft = (left + x) * state.zoom[which] / before - x;
+    scroll.scrollTop = (top + y) * state.zoom[which] / before - y;
   }, {passive: false});
   scroll.addEventListener("pointerdown", (event) => {
-    if (event.button !== 1 && !scroll.classList.contains("pan-active")) return;
+    if (event.target.closest("button, input, a, .comparison-rows, .scenario-title") || (event.button !== 0 && event.button !== 1)) return;
     dragging = {x: event.clientX, y: event.clientY, left: scroll.scrollLeft, top: scroll.scrollTop};
     scroll.setPointerCapture(event.pointerId);
     scroll.classList.add("is-panning");
@@ -946,6 +986,7 @@ function applyDriverFiltersFromControls() {
   state.filters.era = $("#era-filter").value;
   state.filters.achievement = $("#achievement-filter").value;
   state.filters.minStarts = Math.max(0, Math.trunc(Number($("#min-starts-filter").value) || 0));
+  state.page = 0;
   state.visibleLimit = INITIAL_RENDER_LIMIT;
   renderLineUp({animate: false});
   requestComparisonRender();
@@ -981,11 +1022,11 @@ function setupComparisonObserver() {
 }
 
 function bindEvents() {
-  window.APEX_INVERSE.init({state, t, escapeHTML, driverKey, rankDrivers, renderAll, metricName,
-    metricColor: (key) => METRIC_COLORS[state.dataset.metrics.findIndex((metric) => metric.key === key) % METRIC_COLORS.length]});
+  window.APEX_INVERSE.init({state, t, escapeHTML, driverKey, rankDrivers, renderAll, metricName, driverIdentity,
+    metricColor});
   $("#language-select").addEventListener("change", (event) => applyLanguage(event.target.value));
   $("#share-site").addEventListener("click", shareSite);
-  $("#reset-weights").addEventListener("click", () => applyPreset("balanced"));
+  $("#reset-weights").addEventListener("click", () => resetWeights());
   $("#view-stacked").addEventListener("click", () => setView("stacked"));
   $("#view-table").addEventListener("click", () => setView("table"));
   $("#filter-toggle").addEventListener("click", (event) => {
@@ -996,7 +1037,15 @@ function bindEvents() {
   $("#reset-filters").addEventListener("click", () => resetDriverFilters());
   ["#team-filter", "#country-filter", "#era-filter", "#achievement-filter"].forEach((selector) => $(selector).addEventListener("change", applyDriverFiltersFromControls));
   $("#min-starts-filter").addEventListener("input", scheduleFilterUpdate);
-  bindViewport("lineup");
+  let lineupScrollFrame = 0;
+  $('#lineup-scroll').addEventListener('scroll', () => {
+    if (lineupScrollFrame) return;
+    lineupScrollFrame = requestAnimationFrame(() => {
+      lineupScrollFrame = 0;
+      const viewport = $('#lineup-scroll');
+      if (viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 200) loadMoreDrivers();
+    });
+  }, {passive:true});
   bindViewport("compare");
   setupComparisonObserver();
   $("#weight-list").addEventListener("click", (event) => {
@@ -1020,6 +1069,7 @@ function bindEvents() {
       const detail = $("#lineup-table").querySelector(`[data-detail-driver="${key}"]`);
       if (detail && open && !detail.firstElementChild && driver) detail.innerHTML = driverDetailContent(driver);
       detail?.classList.toggle("is-open", open);
+      detail?.setAttribute("aria-hidden", String(!open));
     }
     if (event.target.closest("[data-load-more]")) loadMoreDrivers();
   });
@@ -1045,44 +1095,201 @@ function bindEvents() {
   $("#driver-search").addEventListener("input", (event) => {
     scheduleFilterUpdate();
   });
-  let scrollFrame = 0;
-  $("#lineup-scroll").addEventListener("scroll", (event) => {
-    if (scrollFrame) return;
-    scrollFrame = requestAnimationFrame(() => {
-      scrollFrame = 0;
-      const viewport = event.currentTarget;
-      if (viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 260) loadMoreDrivers();
-    });
-  }, {passive: true});
-  $("#compact-toggle").addEventListener("click", (event) => {
-    state.compact = !state.compact;
-    event.currentTarget.setAttribute("aria-pressed", String(state.compact));
-    renderLineUp();
-  });
   $("#copy-code").addEventListener("click", copyCode);
   $("#import-code").addEventListener("click", importCode);
-  $("#season-select").addEventListener("change", (event) => loadSeason(event.target.value));
-  $("#points-mode").addEventListener("change", async (event) => {
-    event.target.disabled = true;
-    try { await setPointsMode(event.target.checked); }
-    catch (error) { event.target.checked = state.pointsMode === "current"; showToast(error.message); }
-    finally { event.target.disabled = false; }
-  });
   $("#year-range-filter").addEventListener("submit", (event) => {
     event.preventDefault();
     applyYearRange();
   });
   $("#reset-year-range").addEventListener("click", () => loadSeason("all"));
   $("#save-scenario").addEventListener("click", () => {
-    const input = $("#scenario-name");
-    const name = input.value.trim() || t("customScenario", {number: state.scenarios.length + 1});
-    state.scenarios.push(frozenScenario(name, state.weights, state.scenarios.length, state.enabled));
-    if (state.scenarios.length > 6) state.scenarios.shift();
-    input.value = "";
-    renderScenarios();
-    requestComparisonRender();
-    showToast(t("savedScenario", {name}));
+    syncActiveScenario();
+    addScenarioFromWeights();
+    renderAll();
   });
+  bindStudio();
+}
+
+function syncActiveScenario() {
+  const current = state.scenarios.find(s => s.id === state.activeScenario);
+  if (!current) return;
+  current.weights = {...state.weights}; current.enabled = {...state.enabled}; current.ranking = null;
+}
+function setOverview(open) {
+  const next = open && state.scenarios.length > 1;
+  const changed = state.overview !== next;
+  const update = () => {
+    state.overview = next;
+    $(".studio").classList.toggle("is-comparing", next);
+    $(".tool-rail").hidden = next;
+    if (next) closeStudioTools();
+    $("#single-view").hidden = next;
+    $("#compare").hidden = !next;
+    $("#overview-toggle").hidden = state.scenarios.length < 2;
+    $("#overview-toggle").setAttribute("aria-pressed", String(next));
+    $("#overview-toggle").innerHTML = studioIcon(next ? "collapse" : "expand");
+    state.comparisonVisible = next;
+    if (next) { renderComparison(); state.comparisonDirty = false; }
+    else if (state.dataset) renderLineUp({animate: false});
+  };
+  if (!changed || !state.dataset || matchMedia("(prefers-reduced-motion: reduce)").matches) { update(); return; }
+  state.viewTransition?.skipTransition();
+  if (document.startViewTransition) {
+    state.viewTransition = document.startViewTransition(update);
+    state.viewTransition.finished.catch(() => {});
+  } else {
+    update();
+    $(next ? "#compare" : "#single-view").animate([
+      {opacity: .2, transform: next ? "scale(1.12)" : "scale(.84)"},
+      {opacity: 1, transform: "scale(1)"}
+    ], {duration: 420, easing: "cubic-bezier(.22,.7,.2,1)"});
+  }
+}
+function openScenario(id) {
+  state.viewTransition?.skipTransition();
+  syncActiveScenario();
+  const s = state.scenarios.find(s => s.id === id);
+  if (!s) return;
+  state.activeScenario = id; state.weights = {...s.weights}; state.enabled = {...s.enabled};
+  state.activePreset = null; state.page = 0;
+  $("#setup-name").value = scenarioName(s);
+  window.APEX_INVERSE.invalidate();
+  setView("stacked"); setOverview(false); renderAll();
+}
+function addScenarioFromWeights() {
+  const s = frozenScenario(`${t("customScenario", {number: state.scenarios.length + 1})}`, state.weights, state.scenarios.length, state.enabled);
+  s.rankPositions = new Map(state.ranked.map((driver, i) => [driverKey(driver), i + 1]));
+  const source = state.overview ? document.querySelector(`.comparison-column[data-scenario="${state.activeScenario}"] .comparison-rows`) : $('#lineup-scroll');
+  s.seedMotion = window.APEX_MOTION.snapshot(source, state.overview ? '.compare-row' : '.lineup-row[data-driver]', state.overview ? 'data-flow-driver' : 'data-driver');
+  if (!state.overview) {
+    const scale = (32) / (38);
+    const headerHeight = source?.querySelector(".stacked-header,.lineup-row.header")?.getBoundingClientRect().height || 0;
+    s.seedMotion.forEach(row => { row.top = (row.top - headerHeight) * scale; });
+  }
+  state.scenarios.push(s); state.activeScenario = s.id;
+  $("#setup-name").value = s.name;
+  setOverview(true);
+}
+function fitCanvas() {
+  const board = $("#comparison-chart .comparison-board"), viewport = $("#comparison-chart");
+  if (!board) return;
+  setZoom("compare", Math.min((viewport.clientWidth - 48) / parseFloat(board.style.width), (viewport.clientHeight - 48) / parseFloat(board.style.height), 1));
+  viewport.scrollLeft = 0; viewport.scrollTop = 0;
+}
+let studioTool = null;
+function closeStudioTools({restoreFocus = false} = {}) {
+  const previous = studioTool;
+  ["settings", "reverse", "code"].forEach(key => {
+    $("#"+key+"-panel").hidden = true;
+    $("#"+key+"-toggle").setAttribute("aria-expanded", "false");
+  });
+  studioTool = null;
+  if (restoreFocus && previous) $("#"+previous+"-toggle").focus();
+}
+function positionCodePanel() {
+  const panel = $("#code-panel");
+  if (innerWidth <= 720) { panel.style.right = ""; panel.style.top = ""; return; }
+  const anchor = $(".setup-cluster").getBoundingClientRect();
+  panel.style.right = `${Math.max(12, innerWidth - anchor.right)}px`;
+  panel.style.top = `${anchor.bottom + 10}px`;
+}
+function openStudioTool(key) {
+  closeStudioTools(); studioTool = key;
+  $("#"+key+"-panel").hidden = false;
+  $("#"+key+"-toggle").setAttribute("aria-expanded", "true");
+  if (key === "reverse") {
+    if (state.overview) setOverview(false);
+  }
+  if (key === "code") { positionCodePanel(); renderCode(); $("#code-message").textContent = ""; $("#weight-import").focus(); }
+}
+function bindStudio() {
+  bindDriverDragging();
+  window.addEventListener("resize", () => { if (studioTool === "code") positionCodePanel(); });
+  ["settings", "reverse", "code"].forEach(key => {
+    $("#"+key+"-toggle").onclick = () => studioTool === key ? closeStudioTools({restoreFocus:true}) : openStudioTool(key);
+    $("#"+key+"-close").onclick = () => closeStudioTools({restoreFocus:true});
+  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeStudioTools({restoreFocus:true}); $("#filter-drawer").hidden = true; $("#filter-toggle").setAttribute("aria-expanded", "false"); $("#period-popover").hidden = true; } });
+  document.addEventListener("pointerdown", e => {
+    if (studioTool === "code" && !e.target.closest("#code-panel,#code-toggle")) closeStudioTools();
+  });
+  $("#period-toggle").onclick = () => { const el = $("#period-popover"); el.hidden = !el.hidden; $("#period-toggle").setAttribute("aria-expanded", String(!el.hidden)); };
+  $("#year-range-filter").addEventListener("submit", () => { $("#period-popover").hidden = true; });
+  $("#overview-toggle").onclick = () => setOverview(!state.overview);
+  $("#setup-name").addEventListener("change", e => {
+    const s = state.scenarios.find(s => s.id === state.activeScenario);
+    if (s) { s.name = e.target.value.trim() || t("customScenario", {number:1}); s.presetKey = null; requestComparisonRender(); }
+  });
+  const beginRename = title => {
+    if (title.querySelector('input')) return;
+    const scenario = state.scenarios.find(s => s.id === title.dataset.renameScenario);
+    if (!scenario) return;
+    const input = document.createElement('input'); input.className = 'scenario-rename';
+    input.value = scenarioName(scenario); input.maxLength = 32; input.setAttribute('aria-label', 'Setup name');
+    title.replaceChildren(input); input.focus(); input.select();
+    let finished = false;
+    const finish = save => {
+      if (finished) return; finished = true;
+      if (save && input.value.trim()) { scenario.name = input.value.trim(); scenario.presetKey = null; }
+      title.textContent = scenarioName(scenario); title.title = scenarioName(scenario);
+      title.closest('.comparison-column').setAttribute('aria-label', t('comparisonRankAria', {name:scenarioName(scenario)}));
+      if (scenario.id === state.activeScenario) $('#setup-name').value = scenarioName(scenario);
+      if (state.comparisonDirty) requestComparisonRender();
+    };
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); finish(e.key === 'Enter'); } });
+  };
+  $('#comparison-chart').addEventListener('dblclick', e => {
+    const title = e.target.closest('[data-rename-scenario]'); if (title) beginRename(title);
+  });
+  $('#comparison-chart').addEventListener('keydown', e => {
+    if (e.target.matches('[data-rename-scenario]') && (e.key === 'Enter' || e.key === 'F2')) { e.preventDefault(); beginRename(e.target); }
+  });
+  $("#comparison-chart").addEventListener("click", e => {
+    const expand = e.target.closest("[data-expand-scenario]");
+    if (expand) openScenario(expand.dataset.expandScenario);
+    const remove = e.target.closest("[data-delete-scenario]");
+    if (remove) {
+      state.scenarios = state.scenarios.filter(s => s.id !== remove.dataset.deleteScenario);
+      if (state.activeScenario === remove.dataset.deleteScenario) openScenario(state.scenarios[0].id);
+      if (state.scenarios.length < 2) setOverview(false);
+      else requestComparisonRender();
+    }
+  });
+  $("#fit-canvas").onclick = fitCanvas;
+  $("#comparison-chart").addEventListener("keydown", e => {
+    if (e.target.closest("button, input, [data-rename-scenario], .comparison-rows")) return;
+    const viewport = e.currentTarget;
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "+", "=", "-", "0"].includes(e.key)) e.preventDefault();
+    if (e.key === "ArrowLeft") viewport.scrollLeft -= 90;
+    if (e.key === "ArrowRight") viewport.scrollLeft += 90;
+    if (e.key === "ArrowUp") viewport.scrollTop -= 90;
+    if (e.key === "ArrowDown") viewport.scrollTop += 90;
+    if (e.key === "+" || e.key === "=") setZoom("compare", state.zoom.compare * 1.2);
+    if (e.key === "-") setZoom("compare", state.zoom.compare / 1.2);
+    if (e.key === "0") fitCanvas();
+  });
+  window.addEventListener("apex-weights-applied", () => { openStudioTool("settings"); });
+  new ResizeObserver(() => { if (state.dataset) renderLineUp({animate:false}); if (state.overview) requestComparisonRender(); }).observe($("#lineup-scroll"));
+  const tooltip = $("#metric-tooltip");
+  function showTip(target) {
+    const rect = target.getBoundingClientRect(); tooltip.textContent = target.dataset.tooltip; tooltip.hidden = false;
+    tooltip.style.left = `${Math.max(12, Math.min(rect.left - 290, innerWidth - 310))}px`;
+    tooltip.style.top = `${Math.max(12, Math.min(rect.top, innerHeight - 100))}px`;
+  }
+  document.addEventListener("mouseover", e => { const target = e.target.closest("[data-tooltip]"); if (target) showTip(target); else tooltip.hidden = true; });
+  document.addEventListener("focusin", e => { const target = e.target.closest("[data-tooltip]"); if (target) showTip(target); else tooltip.hidden = true; });
+  document.addEventListener("focusout", () => { tooltip.hidden = true; });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") tooltip.hidden = true; });
+  let highlightedMetric;
+  const highlightMetric = e => {
+    const key = e.target.closest("[data-segment-metric]")?.dataset.segmentMetric || e.target.closest("[data-control-metric]")?.dataset.controlMetric || e.target.closest(".metric-mini")?.dataset.toggleMetric;
+    if (key === highlightedMetric) return;
+    highlightedMetric = key;
+    document.querySelectorAll(".stack-segment").forEach(s => s.classList.toggle("metric-dimmed", Boolean(key) && s.dataset.segmentMetric !== key));
+  };
+  document.addEventListener("mouseover", highlightMetric);
+  document.addEventListener("focusin", highlightMetric);
 }
 
 async function initialise() {
@@ -1097,20 +1304,15 @@ async function initialise() {
       if (!window.APEX_STATIC_DATA) throw apiError;
       state.metadata = await window.APEX_STATIC_DATA.metadata();
     }
-    const select = $("#season-select");
-    select.innerHTML = state.metadata.seasons.map((season) => `<option value="${season.year}">${escapeHTML(seasonOptionLabel(season.year))}</option>`).join("");
     const years = availableYears();
     const yearOptions = years.map((year) => `<option value="${year}">${year}</option>`).join("");
     $("#year-from").innerHTML = yearOptions;
     $("#year-to").innerHTML = yearOptions;
     if (!state.metadata.default_year) throw new Error(t("noSeasons"));
-    select.value = String(state.metadata.default_year);
     renderQuality();
     await loadSeason(state.metadata.default_year);
   } catch (error) {
     $("#lineup-table").innerHTML = `<div class="loading">${escapeHTML(error.message)}</div>`;
-    $("#data-notice").querySelector("strong").textContent = t("dataFailed");
-    $("#data-notice").querySelector("p").textContent = error.message;
   }
 }
 

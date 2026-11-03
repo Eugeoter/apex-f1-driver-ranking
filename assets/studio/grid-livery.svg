@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 40" fill="none">
+ <defs><linearGradient id="fade"><stop stop-color="#f00827" stop-opacity="0"/><stop offset=".65" stop-color="#f00827" stop-opacity=".5"/><stop offset="1" stop-color="#f00827"/></linearGradient><pattern id="flag" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M0 0h5v5H0zm5 5h5v5H5z" fill="#aab3be"/></pattern></defs>
+ <path d="M0 32h420l20-24h182" stroke="url(#fade)" stroke-width="2"/>
+ <path d="M160 37h270l20-24h172" stroke="#f00827" stroke-opacity=".2"/>
+ <path d="M550 18h68l-8 12h-68z" fill="#f00827"/>
+ <path d="M530 18h9l-8 12h-9zm-15 0h9l-8 12h-9z" fill="#f00827" fill-opacity=".45"/>
+ <path d="m631 7 27 4-5 22-27-4z" fill="url(#flag)"/><path d="m631 7-6 29" stroke="#aab3be"/>
+</svg>

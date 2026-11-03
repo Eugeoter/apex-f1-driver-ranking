@@ -187,22 +187,30 @@ window.APEX_INVERSE = (() => {
     $("#inverse-solve").disabled = selected.length < 2;
   }
 
+  function addDriver(id, position = selected.length) {
+    if (!availableDrivers().some(row => api.driverKey(row) === id) || selected.includes(id) || selected.length >= 10) return false;
+    selected.splice(Math.max(0, Math.min(selected.length, position)), 0, id);
+    orderChanged(); return true;
+  }
+
   function renderList() {
     const rows = selectedRows();
-    $("#inverse-list").innerHTML = rows.map((row, index) => `<li draggable="true" data-inverse-index="${index}"><span class="inverse-grip" aria-hidden="true">⋮⋮</span><span class="inverse-rank">${index + 1}</span><span class="inverse-name">${api.escapeHTML(row.full_name)}<small>${api.escapeHTML(api.t("inverseStarts", {count: row.race_starts || 0}))}</small></span><div class="inverse-actions"><button type="button" data-inverse-action="up" data-index="${index}" ${index === 0 ? "disabled" : ""} aria-label="${api.escapeHTML(api.t("inverseMoveUp", {name: row.full_name}))}">↑</button><button type="button" data-inverse-action="down" data-index="${index}" ${index === rows.length - 1 ? "disabled" : ""} aria-label="${api.escapeHTML(api.t("inverseMoveDown", {name: row.full_name}))}">↓</button><button type="button" data-inverse-action="remove" data-index="${index}" aria-label="${api.escapeHTML(api.t("inverseRemove", {name: row.full_name}))}">×</button></div></li>`).join("");
+    $("#inverse-list").classList.toggle("is-empty", rows.length === 0);
+    $("#inverse-list").dataset.placeholder = api.t("dropDrivers");
+    $("#inverse-list").innerHTML = rows.map((row, index) => `<li draggable="true" data-inverse-index="${index}"><span class="inverse-grip" aria-hidden="true">⋮⋮</span><span class="inverse-rank">${index + 1}</span><span class="inverse-name">${api.escapeHTML(row.full_name)}<small>${api.driverIdentity(row)}</small></span><div class="inverse-actions"><button type="button" data-inverse-action="up" data-index="${index}" ${index === 0 ? "disabled" : ""} aria-label="${api.escapeHTML(api.t("inverseMoveUp", {name: row.full_name}))}">↑</button><button type="button" data-inverse-action="down" data-index="${index}" ${index === rows.length - 1 ? "disabled" : ""} aria-label="${api.escapeHTML(api.t("inverseMoveDown", {name: row.full_name}))}">↓</button><button type="button" data-inverse-action="remove" data-index="${index}" aria-label="${api.escapeHTML(api.t("inverseRemove", {name: row.full_name}))}">×</button></div></li>`).join("");
   }
 
   function renderResult() {
     const target = $("#inverse-result");
     if (!solution) {
-      target.innerHTML = `<p class="inverse-empty">${api.escapeHTML(api.t(selected.length < 2 ? "inverseNeedTwo" : "inverseReady"))}</p>`;
+      target.innerHTML = "";
       return;
     }
     if (!solution.success) {
       target.innerHTML = `<p class="inverse-empty">${api.escapeHTML(api.t(solution.reason))}</p>`;
       return;
     }
-    target.innerHTML = `<p class="inverse-success">${api.escapeHTML(api.t("inverseMatched"))}</p><p class="inverse-hint">${api.escapeHTML(api.t("inverseExploreHint"))}</p><div class="inverse-weight-list">${solution.keys.map((key) => `<div class="inverse-weight-row" data-inverse-key="${api.escapeHTML(key)}" style="--segment:${api.metricColor(key)}"><div class="inverse-vertical-control"><span class="inverse-slider-max"></span><input id="inverse-weight-${api.escapeHTML(key)}" type="range" step="0.1" data-inverse-weight="${api.escapeHTML(key)}" aria-label="${api.escapeHTML(api.t("inverseWeightAria", {name: api.metricName(key)}))}"><span class="inverse-slider-min"></span></div><div class="inverse-weight-detail"><div class="inverse-weight-heading"><label for="inverse-weight-${api.escapeHTML(key)}">${api.escapeHTML(api.metricName(key))}</label><strong class="inverse-weight-value"></strong></div><div class="inverse-feasible-track" aria-hidden="true"><i></i><b></b></div><small class="inverse-weight-range"></small></div></div>`).join("")}</div><p class="inverse-hint">${api.escapeHTML(api.t("inverseNotUnique"))}</p><button class="button primary" id="inverse-apply" type="button">${api.escapeHTML(api.t("inverseApply"))}</button>`;
+    target.innerHTML = `<div class="inverse-weight-list">${solution.keys.map((key) => `<div class="inverse-weight-row" data-inverse-key="${api.escapeHTML(key)}" style="--segment:${api.metricColor(key)}"><div class="inverse-vertical-control"><span class="inverse-slider-max"></span><input id="inverse-weight-${api.escapeHTML(key)}" type="range" step="0.1" data-inverse-weight="${api.escapeHTML(key)}" aria-label="${api.escapeHTML(api.t("inverseWeightAria", {name: api.metricName(key)}))}"><span class="inverse-slider-min"></span></div><div class="inverse-weight-detail"><div class="inverse-weight-heading"><label for="inverse-weight-${api.escapeHTML(key)}">${api.escapeHTML(api.metricName(key))}</label><strong class="inverse-weight-value"></strong></div><div class="inverse-feasible-track" aria-hidden="true"><i></i><b></b></div><small class="inverse-weight-range"></small></div></div>`).join("")}</div><button class="button primary" id="inverse-apply" type="button">${api.escapeHTML(api.t("inverseApply"))}</button>`;
     refreshWeightControls();
   }
 
@@ -222,7 +230,7 @@ window.APEX_INVERSE = (() => {
       row.querySelector(".inverse-slider-max").textContent = max.toFixed(1);
       row.querySelector(".inverse-slider-min").textContent = min.toFixed(1);
       row.querySelector(".inverse-weight-value").textContent = `${weights[index].toFixed(1)}%`;
-      row.querySelector(".inverse-weight-range").textContent = api.t("inverseFeasibleRange", {min: min.toFixed(1), max: max.toFixed(1)});
+      row.querySelector(".inverse-weight-range").textContent = `${min.toFixed(1)}–${max.toFixed(1)}%`;
       const track = row.querySelector(".inverse-feasible-track");
       track.style.setProperty("--low", `${min}%`);
       track.style.setProperty("--width", `${Math.max(0, max - min)}%`);
@@ -324,11 +332,10 @@ window.APEX_INVERSE = (() => {
     });
     $("#inverse-add").addEventListener("click", () => {
       const id = $("#inverse-driver").value;
-      if (!id || selected.includes(id) || selected.length >= 10) return;
-      selected.push(id);
+      if (!addDriver(id)) return;
       $("#inverse-search").value = "";
       closeSuggestions();
-      orderChanged();
+      render();
     });
     $("#inverse-list").addEventListener("dragstart", (event) => {
       const row = event.target.closest("li[data-inverse-index]");
@@ -339,16 +346,23 @@ window.APEX_INVERSE = (() => {
       row.classList.add("is-dragging");
     });
     $("#inverse-list").addEventListener("dragover", (event) => {
-      if (draggedIndex === null) return;
+      if (draggedIndex === null && !Array.from(event.dataTransfer.types).includes("application/x-apex-driver")) return;
       event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
+      event.dataTransfer.dropEffect = draggedIndex === null ? "copy" : "move";
       clearDropStyles();
       const row = event.target.closest("li[data-inverse-index]");
       if (!row) return;
       row.classList.add(event.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2 ? "drop-after" : "drop-before");
     });
     $("#inverse-list").addEventListener("drop", (event) => {
-      if (draggedIndex === null) return;
+      if (draggedIndex === null) {
+        const id = event.dataTransfer.getData("application/x-apex-driver");
+        if (!id) return;
+        event.preventDefault();
+        const row = event.target.closest("li[data-inverse-index]");
+        const at = row ? Number(row.dataset.inverseIndex) + Number(event.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2) : selected.length;
+        addDriver(id, at); clearDropStyles(); return;
+      }
       event.preventDefault();
       const row = event.target.closest("li[data-inverse-index]");
       const target = row ? Number(row.dataset.inverseIndex) + Number(event.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2) : selected.length;
@@ -395,10 +409,10 @@ window.APEX_INVERSE = (() => {
       api.state.enabled = Object.fromEntries(api.state.dataset.metrics.map((metric) => [metric.key, true]));
       api.state.activePreset = null;
       api.renderAll();
-      $("#lineup").scrollIntoView({behavior: "smooth", block: "start"});
+      window.dispatchEvent(new Event("apex-weights-applied"));
     });
     render();
   }
 
-  return {init, render, reset, invalidate, solveOrder, rebalanced, feasibleRange};
+  return {init, render, reset, invalidate, addDriver, solveOrder, rebalanced, feasibleRange};
 })();

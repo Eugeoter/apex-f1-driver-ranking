@@ -147,4 +147,78 @@ const INVERSE_UI = {
 };
 Object.entries(INVERSE_UI).forEach(([language, copy]) => Object.assign(APEX_I18N[language].ui, copy));
 
+const DUEL_UI = {
+  en: {duelAgainst: "Compare with", duelSelect: "Choose a comparison driver", duelRadar: "{first} versus {second}: performance radar", duelScale: "Normalized performance · 0–100, higher is better. Missing values are omitted. Solid line: first driver; dashed line: second driver. Bars use the same scale; figures show original values."},
+  zh: {duelAgainst: "对比车手", duelSelect: "选择对比车手", duelRadar: "{first} 与 {second} 的表现雷达图", duelScale: "归一化表现：0–100，越高越好；缺失值留空。实线为左侧车手，虚线为右侧车手。数据条使用同一尺度，数字显示原始值。"},
+  ja: {duelAgainst: "比較相手", duelSelect: "比較するドライバーを選択", duelRadar: "{first} と {second} のレーダーチャート", duelScale: "正規化した性能：0–100、高いほど良好。欠損値は省略。実線は左、破線は右のドライバー。棒は同じ尺度、数値は元の値。"},
+  fr: {duelAgainst: "Comparer avec", duelSelect: "Choisir un pilote à comparer", duelRadar: "Radar de performance : {first} et {second}", duelScale: "Performance normalisée de 0 à 100, plus haut = mieux. Valeurs manquantes omises. Trait plein : pilote à gauche ; pointillés : pilote à droite. Barres normalisées, chiffres bruts."},
+  ko: {duelAgainst: "비교 드라이버", duelSelect: "비교할 드라이버 선택", duelRadar: "{first} 대 {second} 성능 레이더", duelScale: "정규화 성능 0–100, 높을수록 좋음. 결측값 제외. 실선: 왼쪽, 점선: 오른쪽 드라이버. 막대는 동일 척도, 숫자는 원래 값."},
+  hi: {duelAgainst: "तुलना करें", duelSelect: "तुलना के लिए ड्राइवर चुनें", duelRadar: "{first} और {second} का प्रदर्शन रडार", duelScale: "सामान्यीकृत प्रदर्शन 0–100, अधिक बेहतर है। अनुपलब्ध मान छोड़ दिए गए हैं। ठोस रेखा: बायाँ ड्राइवर; बिंदीदार: दायाँ। पट्टियाँ इसी पैमाने पर, अंक मूल मान हैं।"}
+};
+Object.entries(DUEL_UI).forEach(([language, copy]) => Object.assign(APEX_I18N[language].ui, copy));
+
+const WORKSPACE_UI = {
+  en: {setupGroup:"Ranking setup",tuningTools:"Ranking tools",tuneWeights:"Weights",tuneReverse:"Reverse",duelMode:"Driver PK",duelLeft:"Left driver · solid",duelRight:"Right driver · dashed",duelSwap:"Swap drivers",targetOrder:"Target order",resultWeights:"Matching weights",currentSetup:"Current setup",importSetup:"Import a setup",pasteCode:"Paste a weight code",setupCode:"Code"},
+  zh: {setupGroup:"排名方案",tuningTools:"排名工具",tuneWeights:"权重",tuneReverse:"反推",duelMode:"车手 PK",duelLeft:"左侧车手 · 实线",duelRight:"右侧车手 · 虚线",duelSwap:"交换车手",targetOrder:"目标排名",resultWeights:"匹配权重",currentSetup:"当前方案",importSetup:"导入新方案",pasteCode:"粘贴权重码",setupCode:"权重码"},
+  ja: {setupGroup:"順位設定",tuningTools:"順位ツール",tuneWeights:"重み",tuneReverse:"逆算",duelMode:"ドライバー対決",duelLeft:"左 · 実線",duelRight:"右 · 破線",duelSwap:"ドライバーを交換",targetOrder:"目標順位",resultWeights:"対応する重み",currentSetup:"現在の設定",importSetup:"設定を読み込む",pasteCode:"重みコードを貼り付け",setupCode:"コード"},
+  fr: {setupGroup:"Réglage du classement",tuningTools:"Outils de classement",tuneWeights:"Poids",tuneReverse:"Inverser",duelMode:"Duel pilotes",duelLeft:"Gauche · trait plein",duelRight:"Droite · pointillés",duelSwap:"Permuter les pilotes",targetOrder:"Ordre souhaité",resultWeights:"Poids calculés",currentSetup:"Réglage actuel",importSetup:"Importer un réglage",pasteCode:"Coller un code de poids",setupCode:"Code"},
+  ko: {setupGroup:"순위 설정",tuningTools:"순위 도구",tuneWeights:"가중치",tuneReverse:"역산",duelMode:"드라이버 대결",duelLeft:"왼쪽 · 실선",duelRight:"오른쪽 · 점선",duelSwap:"드라이버 교환",targetOrder:"목표 순위",resultWeights:"계산된 가중치",currentSetup:"현재 설정",importSetup:"설정 가져오기",pasteCode:"가중치 코드 붙여넣기",setupCode:"코드"},
+  hi: {setupGroup:"रैंकिंग सेटअप",tuningTools:"रैंकिंग उपकरण",tuneWeights:"भार",tuneReverse:"उलटा",duelMode:"ड्राइवर मुकाबला",duelLeft:"बायाँ · ठोस",duelRight:"दायाँ · बिंदीदार",duelSwap:"ड्राइवर बदलें",targetOrder:"चाहा गया क्रम",resultWeights:"मिलते भार",currentSetup:"वर्तमान सेटअप",importSetup:"सेटअप आयात करें",pasteCode:"भार कोड चिपकाएँ",setupCode:"कोड"}
+};
+Object.entries(WORKSPACE_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,copy));
+const SIMPLE_UI = {
+ en:{stackedView:"Overall ranking",tableView:"Driver stats",duelMode:"Compare two",driverTools:"Drivers",inverseTitle:"Weights from order",tuneReverse:"Drivers",setupTitle:"Metric weights",tuneWeights:"Weights",shareTitle:"Setup code",setupCode:"Code",inverseApply:"Use weights",dropDrivers:"Drop drivers here",dragDriver:"Drag {name} to the sidebar, or click to add",reset:"Reset equally",targetOrder:"Driver order",resultWeights:"Weights",inverseNoCommon:"No shared metrics",inverseNoMatch:"This order cannot be matched",customScenario:"Setup {number}"},
+ zh:{stackedView:"综合排名",tableView:"逐项数据",duelMode:"两人对比",driverTools:"车手",inverseTitle:"按排名求权重",tuneReverse:"车手",setupTitle:"调整权重",tuneWeights:"权重",shareTitle:"方案码",setupCode:"方案码",inverseApply:"应用权重",dropDrivers:"拖入车手",dragDriver:"将{name}拖到侧栏，或点击添加",reset:"重置为等权",targetOrder:"车手顺序",resultWeights:"匹配权重",inverseNoCommon:"没有共同指标",inverseNoMatch:"无法匹配此顺序",customScenario:"方案 {number}"},
+ ja:{stackedView:"総合順位",tableView:"詳細データ",duelMode:"2人を比較",driverTools:"ドライバー",inverseTitle:"順位から重み",tuneReverse:"ドライバー",setupTitle:"重みを調整",tuneWeights:"重み",shareTitle:"設定コード",setupCode:"コード",inverseApply:"重みを適用",dropDrivers:"ドライバーをドロップ",dragDriver:"{name}をサイドバーへドラッグ、またはクリックして追加",reset:"均等に戻す",targetOrder:"ドライバー順",resultWeights:"重み",inverseNoCommon:"共通の指標なし",inverseNoMatch:"この順序は再現できません",customScenario:"設定 {number}"},
+ fr:{stackedView:"Classement global",tableView:"Statistiques",duelMode:"Comparer deux",driverTools:"Pilotes",inverseTitle:"Poids selon l'ordre",tuneReverse:"Pilotes",setupTitle:"Ajuster les poids",tuneWeights:"Poids",shareTitle:"Code du réglage",setupCode:"Code",inverseApply:"Appliquer les poids",dropDrivers:"Déposer les pilotes",dragDriver:"Glisser {name} vers le panneau ou cliquer pour ajouter",reset:"Poids égaux",targetOrder:"Ordre des pilotes",resultWeights:"Poids",inverseNoCommon:"Aucun critère commun",inverseNoMatch:"Ordre impossible à reproduire",customScenario:"Réglage {number}"},
+ ko:{stackedView:"종합 순위",tableView:"세부 기록",duelMode:"두 명 비교",driverTools:"드라이버",inverseTitle:"순위로 가중치 찾기",tuneReverse:"드라이버",setupTitle:"가중치 조정",tuneWeights:"가중치",shareTitle:"설정 코드",setupCode:"코드",inverseApply:"가중치 적용",dropDrivers:"드라이버를 놓으세요",dragDriver:"{name} 사이드바로 드래그 또는 클릭하여 추가",reset:"동일 가중치",targetOrder:"드라이버 순서",resultWeights:"가중치",inverseNoCommon:"공통 지표 없음",inverseNoMatch:"재현할 수 없는 순서",customScenario:"설정 {number}"},
+ hi:{stackedView:"कुल रैंकिंग",tableView:"ड्राइवर आँकड़े",duelMode:"दो की तुलना",driverTools:"ड्राइवर",inverseTitle:"क्रम से भार",tuneReverse:"ड्राइवर",setupTitle:"भार बदलें",tuneWeights:"भार",shareTitle:"सेटअप कोड",setupCode:"कोड",inverseApply:"भार लागू करें",dropDrivers:"ड्राइवर यहाँ छोड़ें",dragDriver:"{name} को पैनल में खींचें या जोड़ने के लिए क्लिक करें",reset:"बराबर भार",targetOrder:"ड्राइवर क्रम",resultWeights:"भार",inverseNoCommon:"साझा मापदंड नहीं",inverseNoMatch:"इस क्रम का मिलान नहीं हो सकता",customScenario:"सेटअप {number}"}
+};
+Object.entries(SIMPLE_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,copy));
+
+const AUDIT_UI = {
+  "en": {
+    "normalizedMeaning": "Bars: normalized 0–100, higher is better; numbers: original values. Weight changes do not change these bars.",
+    "normalizedValue": "Normalized: {value}/100",
+    "missingValue": "Missing data; excluded from scoring.",
+    "scoreMeaning": "Weighted mean of available normalized metrics, 0–100. Missing values are excluded; weights are renormalized for each driver.",
+    "histogramMeaning": "Whole selected dataset; 8 normalized bins. Bar height is count, scaled separately for each metric."
+  },
+  "zh": {
+    "normalizedMeaning": "数据条：归一化 0–100，越高越好；数字：原始值。权重调整不改变这些数据条。",
+    "normalizedValue": "归一化：{value}/100",
+    "missingValue": "缺失数据，不参与计分。",
+    "scoreMeaning": "可用指标归一化值的加权平均，范围 0–100；缺失值不计入，每位车手按可用权重重新归一。",
+    "histogramMeaning": "当前数据集全部车手；8 个归一化区间。柱高表示人数，每个指标分别缩放。"
+  },
+  "ja": {
+    "normalizedMeaning": "棒は正規化値0–100（高いほど良好）、数値は元の値。重みは棒の長さを変えません。",
+    "normalizedValue": "正規化：{value}/100",
+    "missingValue": "欠損値は採点から除外。",
+    "scoreMeaning": "利用可能な正規化指標の加重平均（0–100）。欠損値を除き、重みを再正規化。",
+    "histogramMeaning": "選択データ全体、正規化8区間。高さは人数、指標ごとに拡大縮小。"
+  },
+  "fr": {
+    "normalizedMeaning": "Barres : valeurs normalisées 0–100, plus haut = mieux ; chiffres : valeurs brutes. Les poids ne changent pas ces barres.",
+    "normalizedValue": "Normalisé : {value}/100",
+    "missingValue": "Donnée manquante, exclue du score.",
+    "scoreMeaning": "Moyenne pondérée des indicateurs disponibles, 0–100. Valeurs manquantes exclues et poids renormalisés par pilote.",
+    "histogramMeaning": "Jeu de données sélectionné, 8 classes normalisées. Hauteur : effectif, échelle propre à chaque indicateur."
+  },
+  "ko": {
+    "normalizedMeaning": "막대: 정규화 0–100, 높을수록 좋음. 숫자: 원래 값. 가중치는 막대 길이를 바꾸지 않습니다.",
+    "normalizedValue": "정규화: {value}/100",
+    "missingValue": "결측값은 점수에서 제외됩니다.",
+    "scoreMeaning": "사용 가능한 정규화 지표의 가중 평균, 0–100. 결측값을 제외하고 각 드라이버의 가중치를 재정규화합니다.",
+    "histogramMeaning": "전체 선택 데이터, 정규화 구간 8개. 높이는 인원수이며 지표별로 조정됩니다."
+  },
+  "hi": {
+    "normalizedMeaning": "पट्टियाँ: सामान्यीकृत 0–100, अधिक बेहतर; अंक: मूल मान। भार बदलने से पट्टियाँ नहीं बदलतीं।",
+    "normalizedValue": "सामान्यीकृत: {value}/100",
+    "missingValue": "अनुपलब्ध डेटा, स्कोर से बाहर।",
+    "scoreMeaning": "उपलब्ध सामान्यीकृत मापदंडों का भारित औसत, 0–100। अनुपलब्ध मान हटाकर प्रत्येक ड्राइवर के भार फिर सामान्यीकृत होते हैं।",
+    "histogramMeaning": "पूरा चयनित डेटा, 8 सामान्यीकृत वर्ग। ऊँचाई संख्या है, प्रत्येक मापदंड का अलग पैमाना।"
+  }
+};
+Object.entries(AUDIT_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,copy));
 window.APEX_I18N = {metricKeys: I18N_METRIC_KEYS, locales: APEX_I18N};
