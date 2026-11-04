@@ -1,4 +1,4 @@
-# Apex LineUp — F1 Driver Ranking Lab
+# Apex F1 Driver Ranking
 
 An interactive Formula 1 driver ranking tool. Explore how the order changes when you choose a season or year range, adjust the importance of different performance metrics, and compare multiple ranking setups side by side.
 

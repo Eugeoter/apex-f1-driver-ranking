@@ -67,7 +67,7 @@ function applyLanguage(language) {
   document.documentElement.lang = state.language === "zh" ? "zh-CN" : state.language;
   $("#language-select").value = state.language;
   window.APEX_HELP?.render(state.language);
-  document.title = `${t("workspaceTitle")} — Apex LineUp`;
+  document.title = "Apex F1 Driver Ranking";
   document.querySelector('meta[name="description"]').content = t("methodTitle");
   document.querySelectorAll("[data-i18n]").forEach((element) => { element.textContent = t(element.dataset.i18n); });
   document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => { element.placeholder = t(element.dataset.i18nPlaceholder); });
