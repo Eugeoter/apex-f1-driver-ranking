@@ -250,4 +250,15 @@ const RANK_TRACE_UI = {
 Object.entries(RANK_TRACE_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,Object.fromEntries(['rankReference','rankComparedTo','locateRankDriver'].map((key,i)=>[key,copy[i]]))));
 const PADDOCK_UI={en:['Add ranking','Duplicate these weights into a new ranking and compare'],zh:['新增排名','复制当前权重，新增排名并进入比较'],ja:['ランキング追加','現在の重みを複製して比較'],fr:['Ajouter un classement','Dupliquer ces poids pour comparer'],ko:['순위 추가','현재 가중치를 복제하여 비교'],hi:['रैंकिंग जोड़ें','इन भारों की प्रतिलिपि बनाकर तुलना करें']};
 Object.entries(PADDOCK_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,{addRanking:copy[0],addRankingHint:copy[1]}));
+const VIEW_MODE_UI={en:'Switch view mode',zh:'切换视图模式',ja:'表示モードを切り替え',fr:'Changer de mode d’affichage',ko:'보기 모드 전환',hi:'दृश्य मोड बदलें'};
+Object.entries(VIEW_MODE_UI).forEach(([language,label])=>{APEX_I18N[language].ui.switchViewMode=label;});
+const TRACE_PANEL_UI={
+ en:['Rank by setup','P1 = highest','Setup','Rank','Collapse rank history'],
+ zh:['方案间排名','P1 为首位','方案','名次','收起排名变化'],
+ ja:['設定ごとの順位','P1 が最上位','設定','順位','順位の変化を折りたたむ'],
+ fr:['Rang par réglage','P1 = meilleur','Réglage','Rang','Réduire les rangs'],
+ ko:['설정별 순위','P1 = 1위','설정','순위','순위 변화 접기'],
+ hi:['सेटअप के अनुसार स्थान','P1 = पहला','सेटअप','स्थान','स्थान बदलाव समेटें']
+};
+Object.entries(TRACE_PANEL_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,Object.fromEntries(['rankTraceTitle','rankTraceBestFirst','rankTraceSetup','rankTraceRank','rankTraceCollapse'].map((key,i)=>[key,copy[i]]))));
 window.APEX_I18N = {metricKeys: I18N_METRIC_KEYS, locales: APEX_I18N};

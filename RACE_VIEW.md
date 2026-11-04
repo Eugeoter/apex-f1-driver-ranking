@@ -79,3 +79,11 @@ Driver profiles consume the first outside click before any underlying action. Th
 Drag a grandstand name or seat area to reorder metrics in circuit, traditional LineUp or Driver stats. A translucent copy follows the pointer, insertion marks show the destination, and the top strip scrolls when dragging near either edge. Dropping animates the grandstands, stacked contributions and table columns into place. Escape cancels the drag. Checkboxes, sliders, numeric fields and reset buttons retain their original actions.
 
 All views and comparison setups share the display order, saved locally in the browser. Calculations retain the dataset's original metric order so reordering cannot alter scores or floating-point ties. Reduced-motion preferences are respected.
+
+## Comparison rank inspector
+
+Deleting an active setup selects a surviving setup without leaving comparison. Only deletion down to one setup returns to the single ranking view; surviving weights are preserved.
+
+The circuit comparison uses a collapsible floating rank inspector. Hovering or focusing a driver updates a categorical rank line and a compact list; clicking a list entry locates that driver in its circuit. Setup order is explicit and matches the comparison columns. P1 is at the top of a linear rank axis anchored at 1, with the lower limit rounded up to at least P5. Exact ranks are printed next to points and in the list. Missing scores appear as dashes and break the line; they never become P0 or interpolated values. Delta values refer to the first setup, not the previous point. Arrows and signed direction accompany color, following [W3C's use-of-color guidance](https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html). Rank distance is not score distance, and lines do not imply time progression or intermediate setups.
+
+Automatic fit reserves space for the inspector and the independent global zoom toolbar. Collapsing the inspector returns its space to the tracks. Long setup sequences keep readable point spacing through horizontal scrolling inside the inspector; the page itself remains fixed. Reduced motion skips the short point/line transitions.

@@ -39,6 +39,7 @@ const state = {
   shape: localStorage.getItem("apex-ranking-shape") === "lineup" ? "lineup" : "circuit",
   shapeMorphing: false,
   traceDriver: null,
+  traceCollapsed: false,
   zoom: {lineup: 1, compare: 1},
   previousRanks: new Map(),
   expandedDrivers: new Set(),
@@ -558,17 +559,23 @@ function renderLineUp({animate = true} = {}) {
 
 function updateShapeButton() {
   const button=$('#shape-toggle'),index=state.view==='table'?2:state.shape==='circuit'?0:1;
-  const labels=[t('stackedView'),t('showLineup'),t('tableView')];
   const icon=['circuit-view','lineup-view','table-view'][index];
-  if(button.dataset.viewIcon!==icon){button.innerHTML=studioIcon(icon);button.dataset.viewIcon=icon;}
-  button.setAttribute('aria-label',labels[index]+' → '+labels[(index+1)%3]);button.title=labels[(index+1)%3];
+  // Inline these three glyphs: cached external sprites may predate their symbols.
+  const glyphs=[
+    '<g fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="5" width="19" height="14" rx="7"/><rect x="6" y="8.5" width="12" height="7" rx="3.5"/><path d="M12 5v3.5" stroke-dasharray="1 1"/></g>',
+    '<g fill="currentColor"><path d="M3 5h4v3H3zm0 5.5h8v3H3zM3 16h5v3H3z"/><path d="M8 5h13v3H8zm4 5.5h6v3h-6zM9 16h5v3H9z" opacity=".6"/></g>',
+    '<g fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14.5h18M9 4v16M15 9v11"/></g>'
+  ];
+  if(button.dataset.viewIcon!==icon){button.innerHTML=`<svg class="studio-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${glyphs[index]}</svg>`;button.dataset.viewIcon=icon;}
+  button.setAttribute('aria-label',t('switchViewMode'));button.title=t('switchViewMode');
   button.removeAttribute('aria-pressed');
 }
 function cycleRankingView(){
   if(state.shapeMorphing)return;
+  if(state.overview){toggleShape();return;}
   if(state.view==='table'){setView('stacked');if(state.shape!=='circuit')toggleShape();}
   else if(state.shape==='circuit')toggleShape();
-  else{if(state.overview)setOverview(false);setView('table');animateFilteredView();}
+  else{setView('table');animateFilteredView();}
 }
 function animateFilteredView(){
   if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
@@ -616,9 +623,10 @@ function raceOptions(setup, filtered, ranking, vertical, animate = true) {
 function renderRaceComparison() {
   renderRankTrace();
   const container=$('#comparison-chart');
-  const layout=window.APEX_TRACK.comparisonLayout(state.scenarios.length,Math.max(100,container.clientWidth-32),Math.max(100,container.clientHeight-56));
+  const available=comparisonSpace();
+  const layout=window.APEX_TRACK.comparisonLayout(state.scenarios.length,available.width,available.height);
   const {height,width,gap,columns,boardWidth,boardHeight,scale}=layout;
-  const layoutKey=[state.scenarios.length,container.clientWidth,container.clientHeight].join(':');
+  const layoutKey=[state.scenarios.length,available.width,available.height].join(':');
   const changed=state.raceComparisonLayoutKey!==layoutKey;
   const before=new Map([...container.querySelectorAll('.comparison-column')].map(el=>[el.dataset.scenario,el.getBoundingClientRect()]));
   if(changed){state.raceComparisonLayoutKey=layoutKey;state.zoom.compare=scale;container.scrollLeft=0;container.scrollTop=0;}
@@ -652,16 +660,20 @@ function renderRankTrace() {
   strip.hidden=false;
   const reference=scenarioRanking(state.scenarios[0]);
   const driver=reference.find(d=>driverKey(d)===state.traceDriver)||filteredRanking(reference)[0];
-  if(!driver){strip.replaceChildren();return;}
+  if(!driver){strip.hidden=true;strip.traceSignature=null;strip.replaceChildren();return;}
   state.traceDriver=driverKey(driver);
-  const key=state.traceDriver,base=reference.findIndex(d=>driverKey(d)===key)+1;
-  const entries=state.scenarios.map((setup,index)=>{
+  const key=state.traceDriver;
+  const entries=state.scenarios.map(setup=>{
     const list=scenarioRanking(setup),position=list.findIndex(d=>driverKey(d)===key),item=list[position];
-    const rank=item?.availableWeight>0?position+1:null,change=rank&&driver.availableWeight>0?base-rank:null;
-    const delta=change==null?'—':change>0?'▲'+change:change<0?'▼'+(-change):'=';
-    return `<button class="rank-journey-node" data-locate-scenario="${setup.id}" data-locate-driver="${key}" title="${escapeHTML(t('locateRankDriver',{name:driver.full_name,setup:scenarioName(setup)}))}"><span>${escapeHTML(scenarioName(setup))}</span><strong>${rank?'P'+rank:'—'}</strong><small class="${change>0?'rank-up':change<0?'rank-down':''}" title="${escapeHTML(t('rankComparedTo',{name:scenarioName(state.scenarios[0])}))}">${index===0?escapeHTML(t('rankReference')):delta}</small></button>`;
+    return {id:setup.id,name:scenarioName(setup),rank:item?.availableWeight>0?position+1:null};
   });
-  strip.innerHTML=`<div class="rank-trace-driver">${nationalityFlag(driver)}<strong>${escapeHTML(driver.full_name)}</strong></div><div class="rank-journey">${entries.join('<span class="rank-journey-arrow" aria-hidden="true">→</span>')}</div>`;
+  $('#compare').classList.toggle('trace-collapsed',state.traceCollapsed);
+  window.APEX_RANK_TRACE.render(strip,{name:driver.full_name,flag:nationalityFlag(driver),key,entries,escape:escapeHTML,collapsed:state.traceCollapsed,labels:{title:t('rankTraceTitle'),bestFirst:t('rankTraceBestFirst'),setup:t('rankTraceSetup'),rank:t('rankTraceRank'),collapse:t('rankTraceCollapse'),reference:t('rankComparedTo',{name:scenarioName(state.scenarios[0])})}});
+}
+
+function comparisonSpace() {
+  const viewport=$('#comparison-chart'),style=getComputedStyle(viewport);
+  return {width:Math.max(100,viewport.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)),height:Math.max(100,viewport.clientHeight-parseFloat(style.paddingTop)-parseFloat(style.paddingBottom))};
 }
 
 function captureStraightTracks() {
@@ -1263,6 +1275,20 @@ function openScenario(id) {
   window.APEX_INVERSE.invalidate();
   setView("stacked"); setOverview(false); renderAll();
 }
+function removeScenario(id) {
+  if(state.scenarios.length<=1||!state.scenarios.some(s=>s.id===id))return;
+  state.scenarios=state.scenarios.filter(s=>s.id!==id);
+  if(state.activeScenario===id){
+    const next=state.scenarios[0];
+    state.activeScenario=next.id;state.weights={...next.weights};state.enabled={...next.enabled};
+    state.activePreset=null;state.page=0;$('#setup-name').value=scenarioName(next);
+    window.APEX_INVERSE.invalidate();
+    renderLineUp({animate:false});
+  }
+  window.APEX_TRACK.prune(state.scenarios.map(s=>s.id));
+  if(state.scenarios.length===1)setOverview(false);
+  else requestComparisonRender();
+}
 function addScenarioFromWeights() {
   const s = frozenScenario(`My F1 Ranking ${state.scenarios.length + 1}`, state.weights, state.scenarios.length, state.enabled);
   s.rankPositions = new Map(state.ranked.map((driver, i) => [driverKey(driver), i + 1]));
@@ -1280,7 +1306,8 @@ function addScenarioFromWeights() {
 function fitCanvas() {
   const board = $("#comparison-chart .comparison-board"), viewport = $("#comparison-chart");
   if (!board) return;
-  setZoom("compare", Math.min((viewport.clientWidth - 48) / parseFloat(board.style.width), (viewport.clientHeight - 48) / parseFloat(board.style.height), 1));
+  const available=comparisonSpace();
+  setZoom("compare", Math.min(available.width / parseFloat(board.style.width), available.height / parseFloat(board.style.height), 1));
   viewport.scrollLeft = 0; viewport.scrollTop = 0;
 }
 let studioTool = null;
@@ -1339,6 +1366,7 @@ function bindStudio() {
       title.textContent = scenarioName(scenario); title.title = scenarioName(scenario);
       title.closest('.comparison-column').setAttribute('aria-label', t('comparisonRankAria', {name:scenarioName(scenario)}));
       if (scenario.id === state.activeScenario) $('#setup-name').value = scenarioName(scenario);
+      if(state.overview&&state.shape==='circuit')renderRankTrace();
       if (state.comparisonDirty) requestComparisonRender();
     };
     input.addEventListener('blur', () => finish(true));
@@ -1354,14 +1382,10 @@ function bindStudio() {
     const expand = e.target.closest("[data-expand-scenario]");
     if (expand) openScenario(expand.dataset.expandScenario);
     const remove = e.target.closest("[data-delete-scenario]");
-    if (remove) {
-      state.scenarios = state.scenarios.filter(s => s.id !== remove.dataset.deleteScenario);
-      if (state.activeScenario === remove.dataset.deleteScenario) openScenario(state.scenarios[0].id);
-      if (state.scenarios.length < 2) setOverview(false);
-      else requestComparisonRender();
-    }
+    if (remove) removeScenario(remove.dataset.deleteScenario);
   });
   $('#comparison-rank-trace').addEventListener('click',event=>{
+    if(event.target.closest('[data-trace-toggle]')){state.traceCollapsed=!state.traceCollapsed;renderComparison();$('#comparison-rank-trace [data-trace-toggle]').focus();return;}
     const target=event.target.closest('[data-locate-scenario]');if(!target)return;
     const setup=state.scenarios.find(s=>s.id===target.dataset.locateScenario);if(!setup)return;
     const ranking=filteredRanking(scenarioRanking(setup)),index=ranking.findIndex(d=>driverKey(d)===target.dataset.locateDriver);

@@ -569,8 +569,11 @@ button,input,select { line-height:1.2; }
 .wheel-readouts i { line-height:12px; }
 .help-panel { position:fixed; top:54px; right:12px; z-index:80; width:min(550px,calc(100vw - 24px)); max-height:calc(100dvh - 70px); overflow:auto; background:#111b24; border:1px solid #526371; border-top:2px solid #f00827; border-radius:6px; padding:16px; box-shadow:0 12px 35px #0009; font-size:12px; line-height:1.6; }
 .help-panel h2 { margin:0 32px 12px 0; font-size:16px; }.help-panel h3 { font-size:12px; margin:14px 0 4px; color:#b8cbd9; }.help-panel p { margin:5px 0; }.help-panel a { color:#8ddcf4; }.help-panel code { color:#f5d779; white-space:normal; }.help-panel button { position:absolute; right:10px; top:10px; }
-.workspace-toolbar { padding-right:128px; }
+.workspace-toolbar { padding-right:168px; }
 @media(max-width:720px){.workspace-toolbar {padding-right:0;}.workspace-toolbar #shape-toggle {margin-right:120px;}}
+.tool-rail #shape-toggle { width:34px; min-width:34px; height:34px; padding:6px; }
+.tool-rail #shape-toggle .studio-icon { width:21px; height:21px; }
+@media(max-width:850px){.workspace-toolbar {padding-right:0;}.workspace-toolbar .studio-mark {margin-right:168px;}}
 
 /* Metric inspection temporarily shares a straight baseline and physical scale. */
 .race-venue .circuit-infield,.race-venue .circuit-scenery { opacity:calc(1 - var(--alignment,0)); }
@@ -597,3 +600,45 @@ button,input,select { line-height:1.2; }
 .metric-drag-ghost { pointer-events:none!important; opacity:.65; z-index:200; margin:0; filter:drop-shadow(0 10px 12px #0009)!important; will-change:transform; }
 .metric-drop-before { box-shadow:0 -3px #e6f4ff; }.metric-drop-after { box-shadow:0 3px #e6f4ff; }
 .metric-dock .metric-drop-before { box-shadow:-3px 0 #e6f4ff; }.metric-dock .metric-drop-after { box-shadow:3px 0 #e6f4ff; }
+
+/* Keep global zoom controls outside the clipped, pannable comparison canvas. */
+#compare:not([hidden]) { display:flex; flex-direction:column; }
+#compare #comparison-chart { flex:1; height:auto; min-height:0; padding:12px 16px; overflow:hidden; isolation:isolate; }
+#compare > .canvas-zoom { position:relative; inset:auto; transform:none; align-self:center; flex:none; margin:4px 0 10px; z-index:1; }
+
+/* Floating telemetry: the fitted tracks leave room for the rank inspector. */
+#compare { --trace-width:264px; }
+#compare.has-rank-trace #comparison-chart { padding-right:calc(var(--trace-width) + 28px); }
+#compare.has-rank-trace.trace-collapsed #comparison-chart { padding-right:58px; }
+#compare .comparison-rank-trace { position:absolute; z-index:3; top:12px; right:12px; display:flex; flex-direction:column; width:var(--trace-width); min-height:0; max-height:calc(100% - 82px); padding:0; overflow:hidden; border:1px solid #475765; border-top:2px solid #fa4e55; border-radius:9px; background:#111b24f7; box-shadow:0 10px 24px #0007; }
+.rank-trace-head { display:flex; flex:none; align-items:center; gap:8px; height:42px; padding:7px 8px 7px 11px; background:linear-gradient(110deg,#401b27,#17232d 75%); }
+#compare .rank-trace-driver { flex:1; width:auto; min-width:0; gap:7px; }
+#compare .rank-trace-driver strong { font-size:12px; line-height:18px; }
+.rank-trace-toggle { flex:none; display:grid; place-items:center; width:27px; min-height:27px; padding:4px; background:#192630; border:1px solid #526573; border-radius:4px; }
+.rank-trace-toggle svg { width:18px; height:18px; fill:none; stroke:#e3edf4; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.rank-trace-content { display:flex; flex-direction:column; min-height:0; padding:8px 10px 6px; }
+.rank-trace-caption { display:flex; justify-content:space-between; gap:6px; font-size:10px; line-height:16px; color:#d4e1eb; }
+.rank-trace-caption span:last-child { color:#9db0c0; font-size:9px; }
+.rank-trace-plot { flex:none; width:100%; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; scrollbar-color:#526573 transparent; }
+.rank-trace-chart { display:block; width:100%; height:143px; overflow:visible; }
+.rank-trace-grid { fill:none; stroke:#354653; stroke-width:1; stroke-dasharray:2 4; }
+.rank-trace-axis { fill:#a9bac8; font-size:9px; font-variant-numeric:tabular-nums; }
+.rank-trace-line { stroke:#ff6176; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.rank-trace-point circle { fill:#121e28; stroke:#ff8292; stroke-width:2; }
+.rank-trace-value { fill:#f3f6fa; font-size:10px; font-weight:700; paint-order:stroke; stroke:#111b24; stroke-width:3px; font-variant-numeric:tabular-nums; }
+.rank-trace-missing { fill:#a9bac8; font-size:12px; }
+.rank-trace-columns { display:grid; grid-template-columns:1fr 34px 38px; gap:4px; padding:6px 5px 4px; border-bottom:1px solid #394954; font-size:9px; color:#9fb2c2; }
+.rank-trace-columns span:not(:first-child) { text-align:right; }
+.rank-trace-list { min-height:0; max-height:min(224px,calc(100vh - 330px)); overflow-y:auto; scrollbar-width:thin; scrollbar-color:#526573 transparent; }
+.rank-trace-entry { display:grid; grid-template-columns:16px minmax(0,1fr) 34px 38px; gap:4px; align-items:center; width:100%; min-height:28px; padding:4px 5px; border:0; border-bottom:1px solid #2b3b47; border-radius:0; background:transparent; color:#e2ebf1; font-size:11px; text-align:left; }
+.rank-trace-index { color:#9fb2c2; font-size:9px; font-variant-numeric:tabular-nums; }
+.rank-trace-setup { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rank-trace-entry strong,.rank-trace-entry small { text-align:right; font-size:11px; font-variant-numeric:tabular-nums; }
+.rank-trace-entry small { color:#a9bac8; }
+.rank-trace-entry small.rank-up { color:#7de1b2; }.rank-trace-entry small.rank-down { color:#ff92a1; }
+.rank-trace-entry:hover,.rank-trace-entry:focus-visible { background:#273644; outline:1px solid #839aab; outline-offset:-1px; }
+#compare .comparison-rank-trace.is-collapsed { width:36px; border-radius:6px; }
+.comparison-rank-trace.is-collapsed .rank-trace-head { padding:3px; height:34px; }
+.comparison-rank-trace.is-collapsed .rank-trace-driver { display:none; }
+@media(max-width:900px) { #compare { --trace-width:224px; } }
+@media(max-width:560px) { #compare { --trace-width:196px; }.rank-trace-content { padding:6px; }.rank-trace-caption { flex-wrap:wrap; gap:0; }.rank-trace-entry { grid-template-columns:13px minmax(0,1fr) 29px 29px; gap:3px; font-size:10px; }.rank-trace-entry strong,.rank-trace-entry small {font-size:10px;} }
