@@ -36,7 +36,7 @@ const state = {
   search: "",
   filters: {team: "all", country: "all", era: "all", achievement: "all", minStarts: 0},
   view: "stacked",
-  shape: localStorage.getItem("apex-ranking-shape") === "lineup" ? "lineup" : "circuit",
+  shape: "circuit",
   shapeMorphing: false,
   traceDriver: null,
   traceCollapsed: false,
@@ -710,7 +710,6 @@ function toggleShape() {
   const wasCircuit=state.shape==='circuit';
   const before=wasCircuit?window.APEX_TRACK.capture(root):captureStraightTracks();
   state.shape=wasCircuit?'lineup':'circuit';
-  localStorage.setItem('apex-ranking-shape',state.shape);
   state.shapeMorphing=true;
   state.visibleLimit=Math.max(INITIAL_RENDER_LIMIT,...state.scenarios.map(s=>(s.raceOffset||0)+8));
   state.scenarios.forEach(s=>s.visibleLimit=Math.max(INITIAL_RENDER_LIMIT,(s.raceOffset||0)+8));
