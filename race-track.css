@@ -571,3 +571,29 @@ button,input,select { line-height:1.2; }
 .help-panel h2 { margin:0 32px 12px 0; font-size:16px; }.help-panel h3 { font-size:12px; margin:14px 0 4px; color:#b8cbd9; }.help-panel p { margin:5px 0; }.help-panel a { color:#8ddcf4; }.help-panel code { color:#f5d779; white-space:normal; }.help-panel button { position:absolute; right:10px; top:10px; }
 .workspace-toolbar { padding-right:128px; }
 @media(max-width:720px){.workspace-toolbar {padding-right:0;}.workspace-toolbar #shape-toggle {margin-right:120px;}}
+
+/* Metric inspection temporarily shares a straight baseline and physical scale. */
+.race-venue .circuit-infield,.race-venue .circuit-scenery { opacity:calc(1 - var(--alignment,0)); }
+.race-venue.is-metric-aligned .circuit-infield { pointer-events:none; }
+.race-venue.is-metric-aligned .circuit-driver { transition:opacity .12s; }
+.race-venue.is-metric-aligned .circuit-car { opacity:.6; }
+
+.circuit-alignment-guide { opacity:var(--alignment,0); pointer-events:none; }
+
+/* Separate the enabled state from opening the metric comparison. */
+.grandstand-label { display:flex; align-items:center; gap:4px; min-width:0; }
+.grandstand-label .grandstand-name { min-width:0; }
+.grandstand-label .metric-enable { appearance:auto; flex:0 0 11px; width:11px; min-width:11px; height:11px; min-height:11px; padding:0; margin:0; accent-color:var(--segment); cursor:pointer; }
+.grandstand-metric { cursor:pointer; }
+.grandstand-metric:focus-visible { outline:1px solid var(--segment); outline-offset:-2px; }
+.race-venue.is-metric-aligned .circuit-infield-anchor { visibility:hidden; pointer-events:none; }
+.race-venue.is-metric-aligned .circuit-infield-anchor * { pointer-events:none!important; }
+.circuit-badge { pointer-events:auto; cursor:pointer; outline:none; }
+.circuit-badge:focus-visible rect { stroke:#fff; stroke-width:2; }
+
+.grandstand-card .grandstand-metric { cursor:grab; touch-action:none; user-select:none; }
+.metric-order-dragging,.metric-order-dragging * { cursor:grabbing!important; user-select:none!important; }
+.metric-is-dragging { opacity:.3; }
+.metric-drag-ghost { pointer-events:none!important; opacity:.65; z-index:200; margin:0; filter:drop-shadow(0 10px 12px #0009)!important; will-change:transform; }
+.metric-drop-before { box-shadow:0 -3px #e6f4ff; }.metric-drop-after { box-shadow:0 3px #e6f4ff; }
+.metric-dock .metric-drop-before { box-shadow:-3px 0 #e6f4ff; }.metric-dock .metric-drop-after { box-shadow:3px 0 #e6f4ff; }

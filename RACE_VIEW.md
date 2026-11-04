@@ -67,3 +67,15 @@ Rank animations batch geometry reads before writes and animate transforms instea
 Historical records with no retirement reason were previously counted as finishes even when their result was DNS, DNQ or DNPQ. Recomputed 446 affected F1DB driver-season records from the bundled race-results archive and updated the importer. Finish rates now remain in [0, 1]; period-level normalization no longer uses invalid rates as its upper bound. OpenF1 rows are unchanged.
 
 The help icon documents the bundled sources, aggregation, normalization, missing values and weighted contributions in concise Chinese/English. Radar axes use color dots instead of ordinal numbers. Metric highlighting reapplies after DOM replacement, including newly visible cars. Shared font fallbacks and explicit identity line boxes prevent language-dependent vertical drift.
+
+## Click alignment
+
+Click a circuit contribution to inspect that metric on a shared straight baseline. Eight equal-length lanes temporarily replace the concentric paths; the selected contribution moves first and the remaining metrics retain their order. Segment lengths, score totals, weights and driver order are unchanged. A dashed baseline and metric label identify this temporary view. Clicking another contribution changes the metric. Clicking blank space or pressing Escape restores the circuit. Pointer movement and hover leave the selected alignment intact; grandstand bodies open alignment, while the small checkboxes beside metric names alone control enabled state. Both circuit orientations and reduced motion are supported.
+
+Driver profiles consume the first outside click before any underlying action. The invisible infield is removed from hit testing in aligned mode. Cars and left-side driver badges remain the profile entry points.
+
+## Metric ordering
+
+Drag a grandstand name or seat area to reorder metrics in circuit, traditional LineUp or Driver stats. A translucent copy follows the pointer, insertion marks show the destination, and the top strip scrolls when dragging near either edge. Dropping animates the grandstands, stacked contributions and table columns into place. Escape cancels the drag. Checkboxes, sliders, numeric fields and reset buttons retain their original actions.
+
+All views and comparison setups share the display order, saved locally in the browser. Calculations retain the dataset's original metric order so reordering cannot alter scores or floating-point ties. Reduced-motion preferences are respected.

@@ -46,7 +46,7 @@ window.APEX_TRACK = (() => {
   function entry(scene, item) {
     const group=svg('g',{'class':'circuit-driver','data-flow-driver':item.key});
     const track=svg('path',{'class':'circuit-lane'}), segments=svg('g',{'class':'circuit-segments'});
-    const leader=svg('path',{'class':'circuit-leader'}), badge=svg('g',{'class':'circuit-badge'});
+    const leader=svg('path',{'class':'circuit-leader'}), badge=svg('g',{'class':'circuit-badge',tabindex:0,role:'button','data-race-driver':item.key,'aria-label':item.name});
     badge.append(svg('rect',{width:65,height:20,rx:3}),svg('text',{x:32.5,y:13.5,'text-anchor':'middle'}));
     const car=svg('g',{'class':'circuit-car',tabindex:0,role:'button','data-race-driver':item.key});
     car.append(svg('rect',{x:-24,y:-15,width:48,height:30,fill:'transparent'}));
@@ -91,6 +91,7 @@ window.APEX_TRACK = (() => {
     scene.infield=document.createElement('div');scene.infield.className='circuit-infield';
     scene.foreign=svg('foreignObject',{class:'circuit-infield-anchor'});scene.foreign.append(scene.infield);
     scene.canvas.append(scene.layer,scene.foreign,scene.markers);
+    scene.alignmentGuide=svg('g',{class:'circuit-alignment-guide','aria-hidden':'true'});scene.canvas.append(scene.alignmentGuide);
     scene.stage=document.createElement('div');scene.stage.className='circuit-stage';
     scene.camera=document.createElement('div');scene.camera.className='circuit-camera';scene.camera.append(scene.canvas);scene.stage.append(scene.camera);
     scene.left=document.createElement('div');scene.left.className='circuit-grandstand grandstand-left';
@@ -142,7 +143,7 @@ window.APEX_TRACK = (() => {
       const steps={ArrowDown:1,ArrowUp:-1,PageDown:8,PageUp:-8,Home:-Infinity,End:Infinity};
       if(e.key in steps){e.preventDefault();e.stopPropagation();advance(scene,steps[e.key]);}
       if(e.key==='Escape'){cancelProfile(scene);highlight(null);}
-      if((e.key==='Enter'||e.key===' ')&&e.target.matches('.circuit-car')){e.preventDefault();showDriver(scene,e.target.dataset.raceDriver,e.target);}
+      if((e.key==='Enter'||e.key===' ')&&e.target.matches('.circuit-car,.circuit-badge')){e.preventDefault();showDriver(scene,e.target.dataset.raceDriver,e.target);}
     });
     return scene;
   }
@@ -214,20 +215,66 @@ window.APEX_TRACK = (() => {
     scene.offset=next;scene.options.offset=next;scene.options.onWindow?.(next);
     highlight(null);update(scene,{...scene.options,animate:true,windowMotion:Math.sign(amount)});
   }
+  // A common physical scale is essential: concentric lanes have different lengths.
+  function alignedGeometry(lane,vertical,width=1024){
+    const w=vertical?440:width,y=(vertical?205:130)+lane*(vertical?33:32);
+    return Array.from({length:SAMPLES+1},(_,i)=>({x:100+(w-140)*i/SAMPLES,y}));
+  }
+  function metricOffsets(metrics,values,key){
+    const ordered=key?[...metrics.filter(m=>m.key===key),...metrics.filter(m=>m.key!==key)]:metrics;
+    let cursor=0;return Object.fromEntries(ordered.map(m=>{const start=cursor;cursor+=values[m.key]||0;return [m.key,start];}));
+  }
+  function alignMetric(key){
+    scenes.forEach(scene=>{
+      if(!scene.host.isConnected||!scene.host.getClientRects().length)return;
+      const next=scene.options.metrics.some(m=>m.key===key)?key:null;
+      if(scene.alignKey===next)return;
+      cancelAnimationFrame(scene.alignFrame);
+      // Capture the current visual layout, including an interrupted transition.
+      const from=new Map([...scene.nodes].map(([id,n])=>[id,{points:n.displayPoints||n.points,offsets:n.displayOffsets||metricOffsets(scene.options.metrics,n.values,null)}]));
+      scene.alignKey=next;
+      if(next){
+        const top=scene.vertical?175:100,bottom=scene.vertical?450:375,w=scene.vertical?440:scene.w;
+        scene.alignmentGuide.replaceChildren(svg('path',{d:`M100 ${top+12}V${bottom}`,stroke:'#c5d6df','stroke-dasharray':'3 4',opacity:'.6'}));
+        const label=svg('text',{x:100,y:top,fill:'#d5e4ec','font-size':12});label.textContent=scene.options.metrics.find(m=>m.key===next).name;scene.alignmentGuide.append(label);
+        const end=svg('text',{x:w-40,y:top,fill:'#93aab9','font-size':10,'text-anchor':'end'});end.textContent='0–100';scene.alignmentGuide.append(end);
+      }
+      scene.host.classList.toggle('is-metric-aligned',Boolean(next));
+      scene.host.dataset.alignedMetric=next||'';
+      const initial=scene.alignMix||0,target=next?1:0,start=performance.now();
+      const frame=now=>{
+        const t=reduced()?1:clamp((now-start)/480,0,1),ease=t*t*(3-2*t);
+        scene.alignMix=initial+(target-initial)*ease;
+        scene.alignTransition={from,progress:ease};
+        scene.host.style.setProperty('--alignment',scene.alignMix);
+        if(scene.lastStates)draw(scene,scene.lastStates);
+        if(t<1)scene.alignFrame=requestAnimationFrame(frame);else scene.alignTransition=null;
+      };scene.alignFrame=requestAnimationFrame(frame);
+    });
+  }
   function draw(scene,states) {
+    scene.lastStates=states;
+    const visual=states.map(s=>{
+      const to=scene.alignKey?alignedGeometry(s.item.lane,scene.vertical,scene.w):s.points;
+      const offsets=s.orderKey===scene.alignKey&&s.orderOffsets?s.orderOffsets:metricOffsets(scene.options.metrics,s.values,scene.alignKey);
+      const transition=scene.alignTransition,from=transition?.from.get(s.item.key);
+      const points=from?interpolate(from.points,to,transition.progress):to;
+      const displayOffsets=from?Object.fromEntries(scene.options.metrics.map(m=>[m.key,(from.offsets[m.key]||0)+(offsets[m.key]-(from.offsets[m.key]||0))*transition.progress])):offsets;
+      return {...s,points,displayOffsets,sourcePoints:s.points};
+    });
     const labels=[];
-    const cars=states.filter(s=>s.item.scored&&s.opacity>.1).map(s=>{const p=pointAt(s.points,s.score);return {x:p.x-23,y:p.y-14,w:46,h:28};});
+    const cars=visual.filter(s=>s.item.scored&&s.opacity>.1).map(s=>{const p=pointAt(s.points,s.score);return {x:p.x-23,y:p.y-14,w:46,h:28};});
     const overlap=(a,b)=>Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
-    states.forEach(s=>{
+    visual.forEach(s=>{
       const node=s.node;
       const geometryChanged=node.paintedPoints!==s.points;
-      const valuesChanged=geometryChanged||scene.options.metrics.some(m=>node.values[m.key]!==s.values[m.key]);
-      node.points=s.points;node.values=s.values;node.score=s.score;node.opacity=s.opacity;
+      const valuesChanged=geometryChanged||scene.options.metrics.some(m=>node.values[m.key]!==s.values[m.key]||node.displayOffsets?.[m.key]!==s.displayOffsets[m.key]);
+      node.points=s.sourcePoints;node.displayPoints=s.points;node.displayOffsets=s.displayOffsets;node.values=s.values;node.score=s.score;node.opacity=s.opacity;
       if(geometryChanged)node.track.setAttribute('d',path(s.points));node.group.style.opacity=String(s.opacity);node.marker.style.opacity=String(s.opacity);
       let start=0;
       if(valuesChanged)scene.options.metrics.forEach(metric=>{
         const length=s.values[metric.key]||0,segment=node.parts.get(metric.key);
-        segment.setAttribute('d',slice(s.points,start,Math.min(1,start+length)));start+=length;
+        start=s.displayOffsets[metric.key];segment.setAttribute('d',slice(s.points,start,Math.min(1,start+length)));
       });
       node.paintedPoints=s.points;
       const p=pointAt(s.points,s.score),p1=pointAt(s.points,Math.max(0,s.score-.002)),p2=pointAt(s.points,Math.min(1,s.score+.002));
@@ -242,7 +289,7 @@ window.APEX_TRACK = (() => {
         box.cost=obstacles.reduce((sum,b)=>sum+overlap(box,b)*20,0)+Math.hypot(box.x+32-p.x,box.y+10-p.y);
         if(!best||box.cost<best.cost)best=box;
       }
-      const {x,y}=best;labels.push(best);node.badge.setAttribute('transform',`translate(${x} ${y})`);
+      const mix=scene.alignMix||0,anchor=pointAt(s.points,0),x=best.x+(20-best.x)*mix,y=best.y+(anchor.y-10-best.y)*mix;labels.push({...best,x,y});node.badge.setAttribute('transform',`translate(${x} ${y})`);
       node.leader.setAttribute('d',`M${p.x},${p.y} L${x+32},${y+10}`);
     });
   }
@@ -270,7 +317,7 @@ window.APEX_TRACK = (() => {
     });
     const leaving=[...scene.nodes].filter(([key])=>!scene.items.some(i=>i.key===key));
     leaving.forEach(([key,node])=>targets.push({node,item:node.item||{key,scored:false},leaving:true,points:node.points.map(p=>({x:p.x,y:p.y-(options.windowMotion||0)*18})),values:node.values,score:node.score,opacity:0}));
-    const from=targets.map(s=>({stationary:s.node.points.every((p,i)=>p.x===s.points[i].x&&p.y===s.points[i].y),points:s.node.points,values:{...s.node.values},score:s.node.score,opacity:s.node.opacity}));
+    const from=targets.map(s=>({offsets:{...(s.node.displayOffsets||metricOffsets(options.metrics,s.node.values,scene.alignKey))},stationary:s.node.points.every((p,i)=>p.x===s.points[i].x&&p.y===s.points[i].y),points:s.node.points,values:{...s.node.values},score:s.node.score,opacity:s.node.opacity}));
     const start=performance.now(),duration=reduced()||options.animate===false?0:(options.windowMotion?780:660);
     scene.host.dataset.animating=duration?'true':'false';
     const frame=now=>{
@@ -278,7 +325,8 @@ window.APEX_TRACK = (() => {
       draw(scene,targets.map((s,i)=>{
         const phase=options.windowMotion?(s.leaving?Math.min(1,t/.42):s.fresh?clamp((t-.42)/.58,0,1):t):t;
         const ease=1-Math.pow(1-phase,3);
-        return {...s,points:from[i].stationary?s.points:interpolate(from[i].points,s.points,ease),score:from[i].score+(s.score-from[i].score)*ease,opacity:from[i].opacity+(s.opacity-from[i].opacity)*ease,values:Object.fromEntries(options.metrics.map(m=>[m.key,(from[i].values[m.key]||0)+((s.values[m.key]||0)-(from[i].values[m.key]||0))*ease]))};
+        const targetOffsets=metricOffsets(options.metrics,s.values,scene.alignKey);
+        return {...s,orderKey:scene.alignKey,orderOffsets:Object.fromEntries(options.metrics.map(m=>[m.key,(from[i].offsets[m.key]||0)+(targetOffsets[m.key]-(from[i].offsets[m.key]||0))*ease])),points:from[i].stationary?s.points:interpolate(from[i].points,s.points,ease),score:from[i].score+(s.score-from[i].score)*ease,opacity:from[i].opacity+(s.opacity-from[i].opacity)*ease,values:Object.fromEntries(options.metrics.map(m=>[m.key,(from[i].values[m.key]||0)+((s.values[m.key]||0)-(from[i].values[m.key]||0))*ease]))};
       }));
       if(t<1&&scene.host.isConnected)scene.frame=requestAnimationFrame(frame);
       else {scene.host.dataset.animating='false';leaving.forEach(([key,node])=>{node.group.remove();node.marker.remove();scene.nodes.delete(key);});}
@@ -345,18 +393,30 @@ window.APEX_TRACK = (() => {
   function settle() {
     scenes.forEach(scene=>{cancelProfile(scene);highlight(null);if(scene.host.isConnected){const options=scene.options;update(scene,{...options,animate:false});scene.options=options;}});
   }
-  function dismiss() { wheelOwner=null;scenes.forEach(cancelProfile);highlight(null); }
+  function dismiss() { alignMetric(null);wheelOwner=null;scenes.forEach(cancelProfile);highlight(null); }
   function prune(ids) {
-    scenes.forEach((scene,key)=>{if(!ids.some(id=>key===`${id}-h`||key===`${id}-v`)){cancelProfile(scene);if(wheelOwner===scene)wheelOwner=null;cancelAnimationFrame(scene.frame);scene.observer.disconnect();scene.popup.remove();scenes.delete(key);}});
+    scenes.forEach((scene,key)=>{if(!ids.some(id=>key===`${id}-h`||key===`${id}-v`)){cancelProfile(scene);if(wheelOwner===scene)wheelOwner=null;cancelAnimationFrame(scene.frame);cancelAnimationFrame(scene.alignFrame);scene.observer.disconnect();scene.popup.remove();scenes.delete(key);}});
   }
   // The floating profile lives under body, outside its race venue. Capture its
   // wheel gesture and keep momentum bound to that venue after the card closes.
-  document.addEventListener('pointerdown',e=>{if(!e.target.closest('.circuit-profile,[data-race-driver]'))dismiss();});
+  // An outside gesture dismisses the profile and consumes that entire click.
+  let dismissedPointer=false;
+  const outsideProfile=target=>[...scenes.values()].some(scene=>!scene.popup.hidden&&!scene.popup.contains(target));
+  const closeProfiles=()=>{wheelOwner=null;scenes.forEach(cancelProfile);highlight(null);};
+  document.addEventListener('pointerdown',e=>{
+    dismissedPointer=outsideProfile(e.target);
+    if(dismissedPointer){closeProfiles();e.preventDefault();e.stopImmediatePropagation();}
+  },true);
+  document.addEventListener('click',e=>{
+    if(dismissedPointer||outsideProfile(e.target)){
+      dismissedPointer=false;closeProfiles();e.preventDefault();e.stopImmediatePropagation();
+    }
+  },true);
   document.addEventListener('wheel',e=>{
     const owner=[...scenes.values()].find(scene=>!scene.popup.hidden&&scene.popup.contains(e.target));
     const scene=owner||(performance.now()<wheelUntil?wheelOwner:null);
     if(scene&&scene.host.isConnected&&scene.host.getClientRects().length)scene.handleWheel(e,true);
   },{capture:true,passive:false});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')dismiss();});
-  return {render,capture,morph,settle,dismiss,prune,focusDriver:highlight,geometry,infieldBounds,pointAt,windowStart,comparisonLayout,SAMPLES,CAPACITY};
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){dismiss();window.APEX_REFRESH_METRIC?.();}});
+  return {render,capture,morph,settle,dismiss,prune,alignMetric,alignedGeometry,metricOffsets,focusDriver:highlight,geometry,infieldBounds,pointAt,windowStart,comparisonLayout,SAMPLES,CAPACITY};
 })();

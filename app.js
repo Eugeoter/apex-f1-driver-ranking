@@ -141,7 +141,7 @@ function rankDrivers(weights, enabled = state.enabled) {
   return state.dataset.drivers.map((driver) => {
     let weighted = 0;
     let availableWeight = 0;
-    state.dataset.metrics.forEach((metric) => {
+    (state.scoringMetrics||state.dataset.metrics).forEach((metric) => {
       if (enabled[metric.key] === false) return;
       const value = driver.normalised?.[metric.key];
       const weight = Number(weights[metric.key] || 0);
@@ -159,6 +159,8 @@ function normaliseSearchText(value) {
 }
 
 function prepareDataset() {
+  state.scoringMetrics=state.dataset.metrics.slice();
+  state.dataset.metrics=window.APEX_METRIC_ORDER.ordered(state.dataset.metrics);
   state.metricHistograms = new Map();
   state.dataset.drivers.forEach((driver) => {
     driver._searchIndex = normaliseSearchText(`${driver.full_name} ${driver.team_name || ""} ${driver.name_acronym || ""} ${driver.country_code || ""}`);
@@ -421,7 +423,7 @@ function metricControl(metric) {
   const key=metric.key, active=state.enabled[key]!==false, value=formatWeight(state.weights[key]||0);
   const bins=state.metricHistograms.get(key)||[], max=Math.max(1,...bins);
   return `<div class="grandstand-card weight-control ${active?'':'is-disabled'}" data-control-metric="${key}" style="--segment:${metricColor(key)}">
-    <button class="grandstand-metric" type="button" data-toggle-metric="${key}" aria-pressed="${active}" aria-label="${escapeHTML(t(active?'disableMetric':'enableMetric',{name:metricName(key)}))}"><span class="grandstand-name" data-metric-hint="${escapeHTML(metricDescription(key).split(/[;；]/)[0])}">${escapeHTML(metricName(key))}</span><strong class="metric-share"></strong><span class="grandstand-seats" aria-hidden="true">${bins.map(n=>`<i style="height:${n/max*100}%"></i>`).join('')}</span></button>
+    <div class="grandstand-metric" role="button" tabindex="0" data-align-metric="${key}" aria-label="${escapeHTML(metricName(key))}"><span class="grandstand-label"><span class="grandstand-name" data-metric-hint="${escapeHTML(metricDescription(key).split(/[;；]/)[0])}">${escapeHTML(metricName(key))}</span><input class="metric-enable" type="checkbox" data-toggle-metric="${key}" ${active?'checked':''} aria-label="${escapeHTML(t(active?'disableMetric':'enableMetric',{name:metricName(key)}))}"></span><strong class="metric-share"></strong><span class="grandstand-seats" aria-hidden="true">${bins.map(n=>`<i style="height:${n/max*100}%"></i>`).join('')}</span></div>
     <div class="grandstand-adjust"><input data-weight="${key}" type="range" min="0" max="${WEIGHT_MAX}" step="${WEIGHT_STEP}" value="${value}" aria-label="${escapeHTML(t('weightAria',{name:metricName(key)}))}"><input data-weight-input="${key}" type="number" min="0" max="${WEIGHT_MAX}" step="${WEIGHT_STEP}" inputmode="decimal" value="${value}" aria-label="${escapeHTML(t('weightInputAria',{name:metricName(key)}))}"><button class="weight-reset" data-reset-metric="${key}" title="${escapeHTML(t('resetMetric',{name:metricName(key),value:DEFAULT_METRIC_WEIGHT}))}" aria-label="${escapeHTML(t('resetMetric',{name:metricName(key),value:DEFAULT_METRIC_WEIGHT}))}">${studioIcon('reset')}</button></div></div>`;
 }
 function renderWeights() {
@@ -440,7 +442,7 @@ function renderWeightValuesOnly() {
     if(document.activeElement!==number)number.value=formatWeight(value);
     control.classList.toggle('is-disabled',!active);
     const toggle=control.querySelector('[data-toggle-metric]');
-    toggle.setAttribute('aria-pressed',String(active));
+    toggle.checked=active;
     toggle.setAttribute('aria-label',t(active?'disableMetric':'enableMetric',{name:metricName(key)}));
     control.querySelector('.metric-share').textContent=active?Math.round(value/total*100)+'%':'—';
   });
@@ -1400,7 +1402,12 @@ function bindStudio() {
   document.addEventListener("keydown", e => { if (e.key === "Escape") tooltip.hidden = true; });
   let highlightedMetric, highlightedOrigin;
   const highlightMetric = (e,force=false) => {
-    const origin=e.target.closest('[data-segment-metric],[data-control-metric],[data-toggle-metric],[data-metric]');
+    let origin=e.target.closest('[data-segment-metric],[data-control-metric],[data-toggle-metric],[data-metric]');
+    const aligned=document.querySelector('.race-venue.is-metric-aligned');
+    if(aligned){
+      const selected=aligned.dataset.alignedMetric;
+      origin=aligned.querySelector(`[data-segment-metric="${selected}"]`)||origin;
+    }
     const key=origin&&(origin.dataset.segmentMetric||origin.dataset.controlMetric||origin.dataset.toggleMetric||origin.dataset.metric);
     highlightedOrigin=origin;
     if(key===highlightedMetric&&!force)return;highlightedMetric=key;
@@ -1419,6 +1426,16 @@ function bindStudio() {
   const metricObserver=new MutationObserver(()=>window.APEX_REFRESH_METRIC());
   ['#lineup-table','#comparison-chart','#metric-dock'].forEach(selector=>metricObserver.observe($(selector),{childList:true,subtree:true}));
   document.addEventListener('mouseover',highlightMetric);
+  document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.grandstand-metric')){e.preventDefault();e.target.click();}});
+  document.addEventListener('click',e=>{
+    const stand=e.target.closest('.race-venue .grandstand-card');
+    if(stand&&!e.target.closest('input,button')){window.APEX_TRACK.alignMetric(stand.dataset.controlMetric);highlightMetric(e,true);return;}
+    const segment=e.target.closest('.circuit-segment[data-segment-metric]');
+    if(segment){window.APEX_TRACK.alignMetric(segment.dataset.segmentMetric);highlightMetric(e,true);return;}
+    if(!e.target.closest('button,input,select,textarea,a,[role="button"],.grandstand-card,.circuit-profile')){
+      window.APEX_TRACK.alignMetric(null);highlightMetric(e,true);
+    }
+  });
   document.addEventListener('focusin',e=>{if(!e.target.matches('#lineup-scroll,#comparison-chart'))highlightMetric(e);});
   document.addEventListener('mouseout',e=>{if(!e.relatedTarget)highlightMetric({target:document.body});});
 
@@ -1427,6 +1444,11 @@ function bindStudio() {
 async function initialise() {
   applyLanguage(state.language);
   bindEvents();
+  window.APEX_METRIC_ORDER.bind({getMetrics:()=>state.dataset?.metrics||[],commit:keys=>{
+    const byKey=new Map(state.dataset.metrics.map(m=>[m.key,m]));
+    state.dataset.metrics=keys.map(key=>byKey.get(key));
+    renderLineUp();requestComparisonRender();
+  }});
   try {
     try {
       const response = await fetch("./api/seasons");
