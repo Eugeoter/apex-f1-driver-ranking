@@ -44,7 +44,8 @@
 .circuit-window output span { color:#7c8c9e; }
 .circuit-empty { text-align:center; color:#aebdcd; font-size:12px; padding:10px; }
 .circuit-driver,.circuit-roster-row { transition:opacity .18s; }
-.has-driver-focus .circuit-driver:not(.is-driver-focus) { opacity:.23!important; }
+.has-driver-focus .circuit-driver:not(.is-driver-focus) > * { opacity:.23; }
+.circuit-driver.is-retiring,.circuit-driver.is-retiring * { pointer-events:none!important; }
 .has-driver-focus .circuit-roster-row:not(.is-driver-focus) { opacity:.45; }
 .circuit-profile { position:fixed; z-index:100; width:min(430px,calc(100vw - 16px)); max-height:min(440px,calc(100dvh - 16px)); overflow:auto; padding:14px; background:#141c26f5; border:1px solid #627284; border-top:2px solid #f00827; border-radius:6px; box-shadow:0 18px 55px #000c; backdrop-filter:blur(14px); animation:circuit-profile-in .18s ease-out; }
 .circuit-profile .driver-detail-inner { padding:0; display:grid; grid-template-columns:1fr; gap:12px; }
@@ -578,7 +579,7 @@ button,input,select { line-height:1.2; }
 /* Metric inspection temporarily shares a straight baseline and physical scale. */
 .race-venue .circuit-infield,.race-venue .circuit-scenery { opacity:calc(1 - var(--alignment,0)); }
 .race-venue.is-metric-aligned .circuit-infield { pointer-events:none; }
-.race-venue.is-metric-aligned .circuit-driver { transition:opacity .12s; }
+.race-venue.is-metric-aligned:not([data-animating="true"]) .circuit-driver { transition:opacity .12s; }
 .race-venue.is-metric-aligned .circuit-car { opacity:.6; }
 
 .circuit-alignment-guide { opacity:var(--alignment,0); pointer-events:none; }

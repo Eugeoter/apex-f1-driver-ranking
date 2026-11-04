@@ -43,6 +43,27 @@ window.APEX_TRACK = (() => {
   }
   const interpolate = (a,b,t) => a.map((p,i)=>({x:p.x+(b[i].x-p.x)*t,y:p.y+(b[i].y-p.y)*t}));
   function windowStart(value,total) { return clamp(Math.round(value),0,Math.max(0,total-CAPACITY)); }
+  function retirementOpacity(node,now,duration) {
+    // Subsequent wheel events must not restart an outgoing driver's fade.
+    if(node.exitStarted==null){node.exitStarted=now;node.exitOpacity=node.opacity;}
+    const progress=duration?clamp((now-node.exitStarted)/duration,0,1):1;
+    return node.exitOpacity*Math.pow(1-progress,2);
+  }
+  function setRetiring(node,retiring) {
+    if(Boolean(node.retiring)===retiring)return;
+    node.retiring=retiring;
+    [node.group,node.marker].forEach(element=>{
+      element.classList.toggle('is-retiring',retiring);
+      element.style.pointerEvents=retiring?'none':'';
+      if(retiring)element.setAttribute('aria-hidden','true');else element.removeAttribute('aria-hidden');
+    });
+    [node.badge,node.car].forEach(element=>element.setAttribute('tabindex',retiring?-1:0));
+  }
+  function removeEntry(scene,key,node) {
+    node.group.remove();node.marker.remove();
+    if(scene.nodes.get(key)===node)scene.nodes.delete(key);
+    scene.alignTransition?.from.delete(key);
+  }
   function entry(scene, item) {
     const group=svg('g',{'class':'circuit-driver','data-flow-driver':item.key});
     const track=svg('path',{'class':'circuit-lane'}), segments=svg('g',{'class':'circuit-segments'});
@@ -301,9 +322,14 @@ window.APEX_TRACK = (() => {
     scene.offset=windowStart(options.offset??scene.offset,options.drivers.length);
     const chosen=options.drivers.slice(scene.offset,scene.offset+CAPACITY);
     scene.items=chosen.map((driver,lane)=>options.item(driver,lane));
+    const activeKeys=new Set(scene.items.map(item=>item.key));
+    // An interrupted transition may retain its immediate outgoing window only.
+    // A driver that re-enters keeps its rendered position for a smooth reversal.
+    for(const [key,node] of scene.nodes)if(node.retiring&&!activeKeys.has(key))removeEntry(scene,key,node);
     const targets=scene.items.map(item=>{
       let node=scene.nodes.get(item.key);if(!node){node=entry(scene,item);scene.nodes.set(item.key,node);}
-      const fresh=node.opacity===0;node.item=item;
+      setRetiring(node,false);node.exitStarted=null;node.exitOpacity=null;
+      node.item=item;
       node.group.style.setProperty('--team',item.team);node.marker.style.setProperty('--team',item.team);
       node.car.setAttribute('aria-label',`${item.name} · ${item.rank} · ${item.scoreLabel}`);
       node.badge.lastChild.textContent=`${item.rank} ${item.code}`;
@@ -313,23 +339,31 @@ window.APEX_TRACK = (() => {
         segment.style.stroke=metric.color;segment.firstChild.textContent=options.segmentTitle(item.driver,metric.key,item.values[metric.key]||0);
       });
       for(const [key,part] of node.parts)if(!options.metrics.some(m=>m.key===key)){part.remove();node.parts.delete(key);}
-      return {node,item,fresh,points:geometry(item.lane,scene.vertical,scene.w),values:item.values,score:item.score,opacity:1};
+      return {node,item,points:geometry(item.lane,scene.vertical,scene.w),values:item.values,score:item.score,opacity:1};
     });
     const leaving=[...scene.nodes].filter(([key])=>!scene.items.some(i=>i.key===key));
-    leaving.forEach(([key,node])=>targets.push({node,item:node.item||{key,scored:false},leaving:true,points:node.points.map(p=>({x:p.x,y:p.y-(options.windowMotion||0)*18})),values:node.values,score:node.score,opacity:0}));
+    const start=performance.now(),duration=reduced()||options.animate===false?0:(options.windowMotion?320:660),exitDuration=duration?160:0;
+    leaving.forEach(([key,node])=>{
+      setRetiring(node,true);
+      const opacity=retirementOpacity(node,start,exitDuration);
+      if(opacity<=.005){removeEntry(scene,key,node);return;}
+      // Retire in place: translating a complete loop makes it spill off the track.
+      targets.push({node,item:node.item||{key,scored:false},leaving:true,points:node.points,values:node.values,score:node.score,opacity:0});
+    });
     const from=targets.map(s=>({offsets:{...(s.node.displayOffsets||metricOffsets(options.metrics,s.node.values,scene.alignKey))},stationary:s.node.points.every((p,i)=>p.x===s.points[i].x&&p.y===s.points[i].y),points:s.node.points,values:{...s.node.values},score:s.node.score,opacity:s.node.opacity}));
-    const start=performance.now(),duration=reduced()||options.animate===false?0:(options.windowMotion?780:660);
     scene.host.dataset.animating=duration?'true':'false';
     const frame=now=>{
-      const t=duration?clamp((now-start)/duration,0,1):1,e=1-Math.pow(1-t,3);
+      const t=duration?clamp((now-start)/duration,0,1):1;
       draw(scene,targets.map((s,i)=>{
-        const phase=options.windowMotion?(s.leaving?Math.min(1,t/.42):s.fresh?clamp((t-.42)/.58,0,1):t):t;
-        const ease=1-Math.pow(1-phase,3);
+        if(scene.nodes.get(s.item.key)!==s.node)return null;
+        const opacity=s.leaving?retirementOpacity(s.node,now,exitDuration):null;
+        if(s.leaving&&opacity<=.005){removeEntry(scene,s.item.key,s.node);return null;}
+        const ease=1-Math.pow(1-t,3);
         const targetOffsets=metricOffsets(options.metrics,s.values,scene.alignKey);
-        return {...s,orderKey:scene.alignKey,orderOffsets:Object.fromEntries(options.metrics.map(m=>[m.key,(from[i].offsets[m.key]||0)+(targetOffsets[m.key]-(from[i].offsets[m.key]||0))*ease])),points:from[i].stationary?s.points:interpolate(from[i].points,s.points,ease),score:from[i].score+(s.score-from[i].score)*ease,opacity:from[i].opacity+(s.opacity-from[i].opacity)*ease,values:Object.fromEntries(options.metrics.map(m=>[m.key,(from[i].values[m.key]||0)+((s.values[m.key]||0)-(from[i].values[m.key]||0))*ease]))};
-      }));
+        return {...s,orderKey:scene.alignKey,orderOffsets:Object.fromEntries(options.metrics.map(m=>[m.key,(from[i].offsets[m.key]||0)+(targetOffsets[m.key]-(from[i].offsets[m.key]||0))*ease])),points:from[i].stationary?s.points:interpolate(from[i].points,s.points,ease),score:from[i].score+(s.score-from[i].score)*ease,opacity:s.leaving?opacity:from[i].opacity+(s.opacity-from[i].opacity)*ease,values:Object.fromEntries(options.metrics.map(m=>[m.key,(from[i].values[m.key]||0)+((s.values[m.key]||0)-(from[i].values[m.key]||0))*ease]))};
+      }).filter(Boolean));
       if(t<1&&scene.host.isConnected)scene.frame=requestAnimationFrame(frame);
-      else {scene.host.dataset.animating='false';leaving.forEach(([key,node])=>{node.group.remove();node.marker.remove();scene.nodes.delete(key);});}
+      else {scene.frame=0;scene.host.dataset.animating='false';leaving.forEach(([key,node])=>removeEntry(scene,key,node));}
     };
     frame(start);
     // The infield is a compact identity key; the same identities also travel with the cars.
