@@ -20,8 +20,13 @@
 .circuit-car { color:var(--team); cursor:pointer; filter:drop-shadow(0 2px 2px #000); outline:none; }
 .circuit-car:hover,.circuit-car:focus-visible { filter:drop-shadow(0 0 5px #fff); }
 .circuit-badge { pointer-events:none; }
-.circuit-badge rect { fill:#10161f; stroke:var(--team); stroke-width:1; }
-.circuit-badge text { fill:#e9edf3; font-size:10px; font-weight:650; font-family:inherit; }
+.circuit-badge-shell { fill:#111a23; stroke:#576673; stroke-width:.65; }
+.circuit-badge-accent { fill:none; stroke:var(--team); stroke-width:2.5; }
+.circuit-badge text { font-family:inherit; font-variant-numeric:tabular-nums; }
+.circuit-badge-rank { fill:#a3b1bc; font-size:9px; font-weight:500; }
+.circuit-badge-code { fill:#f0f3f6; font-size:11px; font-weight:750; letter-spacing:.35px; }
+.circuit-badge-portrait { overflow:hidden; pointer-events:none; clip-path:circle(50%); }
+.circuit-badge:hover .circuit-badge-shell,.circuit-badge:focus-visible .circuit-badge-shell { fill:#25323e; stroke:#b1c1cc; stroke-width:1; }
 .circuit-leader { fill:none; stroke:var(--team); stroke-width:.8; opacity:.65; pointer-events:none; }
 .circuit-infield { position:absolute; left:25%; right:25%; top:50%; transform:translateY(calc(-50% - 15px)); pointer-events:none; }
 .circuit-score-key { display:flex; justify-content:space-between; gap:6px; margin:0 0 9px; padding:0 4px 7px; border-bottom:1px solid #3a4653; font-size:11px; color:#c0cbd8; pointer-events:auto; }
@@ -593,7 +598,7 @@ button,input,select { line-height:1.2; }
 .race-venue.is-metric-aligned .circuit-infield-anchor { visibility:hidden; pointer-events:none; }
 .race-venue.is-metric-aligned .circuit-infield-anchor * { pointer-events:none!important; }
 .circuit-badge { pointer-events:auto; cursor:pointer; outline:none; }
-.circuit-badge:focus-visible rect { stroke:#fff; stroke-width:2; }
+.circuit-badge:focus-visible .circuit-badge-shell { stroke:#fff; stroke-width:1.5; }
 
 .grandstand-card .grandstand-metric { cursor:grab; touch-action:none; user-select:none; }
 .metric-order-dragging,.metric-order-dragging * { cursor:grabbing!important; user-select:none!important; }
@@ -643,3 +648,5 @@ button,input,select { line-height:1.2; }
 .comparison-rank-trace.is-collapsed .rank-trace-driver { display:none; }
 @media(max-width:900px) { #compare { --trace-width:224px; } }
 @media(max-width:560px) { #compare { --trace-width:196px; }.rank-trace-content { padding:6px; }.rank-trace-caption { flex-wrap:wrap; gap:0; }.rank-trace-entry { grid-template-columns:13px minmax(0,1fr) 29px 29px; gap:3px; font-size:10px; }.rank-trace-entry strong,.rank-trace-entry small {font-size:10px;} }
+
+.grandstand-metric[aria-pressed="true"] .grandstand-name { text-decoration:underline; text-decoration-color:var(--segment); text-underline-offset:4px; }

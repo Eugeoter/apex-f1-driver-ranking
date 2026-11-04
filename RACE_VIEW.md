@@ -91,3 +91,7 @@ Automatic fit reserves space for the inspector and the independent global zoom t
 ## Interrupted scrolling
 
 Outgoing driver loops now fade in place over 160 ms, with a fixed exit deadline. A new window discards older outgoing nodes while retaining any driver that re-enters during a reversal. Retiring cars and badges cannot receive hover, click or keyboard focus. Driver highlighting dims child artwork instead of overriding the animated group opacity. Wheel transitions start immediately from the current rendered state and settle in 320 ms; repeated events no longer defer incoming cars or leave drifting trails outside the track.
+
+### Portrait markers and metric alignment
+- Clicking a grandstand opens its metric on a common straight baseline; clicking the same stand again restores the circuit. Checkboxes still control metric inclusion independently.
+- Car identity badges include the existing driver portrait, with a silhouette fallback, in both circuit orientations and aligned lanes. The collision bounds include the portrait.

@@ -275,14 +275,18 @@ function countryName(code) {
   catch (_) { return code || "—"; }
 }
 
-function driverPortrait(driver, detail = false) {
+function driverPortraitSource(driver) {
   const profile = driver.profile || {};
   const local = profile.portrait_url;
   const localSource = /^\/assets\/drivers\/[a-z0-9-]+\.(?:png|jpg|webp|svg)$/.test(local || "")
     ? new URL(String(local).replace(/^\//, ""), document.baseURI).href
     : "";
   const wikiSource = safeExternalUrl(profile.wiki_thumbnail_url);
-  const source = profile.portrait_source_name === "Generated F1 helmet avatar" && wikiSource ? wikiSource : localSource || safeExternalUrl(driver.headshot_url) || wikiSource;
+  return profile.portrait_source_name === "Generated F1 helmet avatar" && wikiSource ? wikiSource : localSource || safeExternalUrl(driver.headshot_url) || wikiSource;
+}
+
+function driverPortrait(driver, detail = false) {
+  const source = driverPortraitSource(driver);
   const fallback = `<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 36c1-15 5-25 16-27 11 1 16 10 15 25l-6 6H14z" fill="currentColor"/><path d="M13 23c8-6 16-7 24-3l-3 9-20 1z" fill="#090c10" stroke="#fff" stroke-width="1.5"/></svg>`;
   return `<span class="driver-portrait ${detail ? "portrait-large" : ""}"><span class="portrait-fallback">${fallback}</span>${source ? `<img src="${escapeHTML(source)}" alt="" loading="lazy" decoding="async">` : ""}</span>`;
 }
@@ -607,7 +611,7 @@ function raceOptions(setup, filtered, ranking, vertical, animate = true) {
     previous:t('previousGrid'), next:t('nextGrid'), empty:t('inverseNoResults'),
     segmentTitle:(driver,key,value)=>t('contributionTooltip',{name:metricName(key),raw:displayValue(key,driver[key]),weight:formatWeight(setup.weights[key]||0),points:(value*100).toFixed(1)}),
     item:(driver,lane)=>({
-      driver, lane, key:driverKey(driver), name:driver.full_name,
+      driver, lane, key:driverKey(driver), name:driver.full_name, portrait:driverPortraitSource(driver),
       displayName:vertical?(driver.last_name||driver.full_name.split(' ').at(-1)):driver.full_name,
       code:driver.name_acronym || driver.full_name.split(' ').at(-1).slice(0,3).toUpperCase(),
       team:`#${(driver.team_colour||'777777').replace('#','')}`,
@@ -1452,7 +1456,7 @@ function bindStudio() {
   document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.grandstand-metric')){e.preventDefault();e.target.click();}});
   document.addEventListener('click',e=>{
     const stand=e.target.closest('.race-venue .grandstand-card');
-    if(stand&&!e.target.closest('input,button')){window.APEX_TRACK.alignMetric(stand.dataset.controlMetric);highlightMetric(e,true);return;}
+    if(stand&&!e.target.closest('input,button')){const key=stand.dataset.controlMetric;window.APEX_TRACK.alignMetric(stand.closest('.race-venue').dataset.alignedMetric===key?null:key);highlightMetric(e,true);return;}
     const segment=e.target.closest('.circuit-segment[data-segment-metric]');
     if(segment){window.APEX_TRACK.alignMetric(segment.dataset.segmentMetric);highlightMetric(e,true);return;}
     if(!e.target.closest('button,input,select,textarea,a,[role="button"],.grandstand-card,.circuit-profile')){

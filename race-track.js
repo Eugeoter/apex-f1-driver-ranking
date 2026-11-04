@@ -68,13 +68,17 @@ window.APEX_TRACK = (() => {
     const group=svg('g',{'class':'circuit-driver','data-flow-driver':item.key});
     const track=svg('path',{'class':'circuit-lane'}), segments=svg('g',{'class':'circuit-segments'});
     const leader=svg('path',{'class':'circuit-leader'}), badge=svg('g',{'class':'circuit-badge',tabindex:0,role:'button','data-race-driver':item.key,'aria-label':item.name});
-    badge.append(svg('rect',{width:65,height:20,rx:3}),svg('text',{x:32.5,y:13.5,'text-anchor':'middle'}));
+    const portrait=svg('svg',{x:22,y:3,width:22,height:22,viewBox:'0 0 24 24',class:'circuit-badge-portrait','aria-hidden':'true'});
+    portrait.append(svg('path',{d:'M0 0h24v24H0z',fill:'#25343e'}),svg('path',{d:'M4 24v-3a8 8 0 0 1 16 0v3M7 10a5 5 0 1 0 10 0a5 5 0 1 0-10 0',fill:'#82949f'}));
+    if(item.portrait){const photo=svg('image',{href:item.portrait,width:24,height:24,preserveAspectRatio:'xMidYMin slice'});photo.addEventListener('error',()=>photo.remove(),{once:true});portrait.append(photo);}
+    const rankText=svg('text',{x:10,y:18,'text-anchor':'middle',class:'circuit-badge-rank'});
+    badge.append(svg('path',{d:'M3 0H84V21L77 28H3Q0 28 0 25V3Q0 0 3 0Z',class:'circuit-badge-shell'}),svg('path',{d:'M1 5V23',class:'circuit-badge-accent'}),rankText,portrait,svg('text',{x:62,y:18,'text-anchor':'middle',class:'circuit-badge-code'}));
     const car=svg('g',{'class':'circuit-car',tabindex:0,role:'button','data-race-driver':item.key});
     car.append(svg('rect',{x:-24,y:-15,width:48,height:30,fill:'transparent'}));
     car.append(svg('use',{href:'./assets/studio/icons.svg#race-car',x:-21,y:-10,width:42,height:20}));
     const marker=svg('g',{'class':'circuit-driver circuit-marker','data-flow-driver':item.key});
     group.append(track,segments); marker.append(leader,badge,car); scene.layer.append(group);scene.markers.append(marker);
-    return {group,marker,track,segments,leader,badge,car,parts:new Map(),values:{},points:geometry(item.lane,scene.vertical,scene.w),score:0,opacity:0};
+    return {group,marker,track,segments,leader,badge,rankText,car,parts:new Map(),values:{},points:geometry(item.lane,scene.vertical,scene.w),score:0,opacity:0};
   }
   function showDriver(scene,key,anchor) {
     const item=scene.items.find(d=>d.key===key); if(!item) return;
@@ -218,6 +222,7 @@ window.APEX_TRACK = (() => {
       scene.left.innerHTML=metrics.slice(0,split).map(scene.options.renderMetric).join('');
       scene.right.innerHTML=metrics.slice(split).map(scene.options.renderMetric).join('');
       scene.standsSignature=scene.options.controlsSignature;
+      scene.host.querySelectorAll('[data-align-metric]').forEach(stand=>stand.setAttribute('aria-pressed',String(stand.dataset.alignMetric===scene.alignKey)));
     }
     scene.options.syncControls();
   }
@@ -262,6 +267,7 @@ window.APEX_TRACK = (() => {
       }
       scene.host.classList.toggle('is-metric-aligned',Boolean(next));
       scene.host.dataset.alignedMetric=next||'';
+      scene.host.querySelectorAll('[data-align-metric]').forEach(stand=>stand.setAttribute('aria-pressed',String(stand.dataset.alignMetric===next)));
       const initial=scene.alignMix||0,target=next?1:0,start=performance.now();
       const frame=now=>{
         const t=reduced()?1:clamp((now-start)/480,0,1),ease=t*t*(3-2*t);
@@ -305,13 +311,13 @@ window.APEX_TRACK = (() => {
       const w=scene.vertical?440:scene.w,h=scene.vertical?660:500;
       let best;
       const obstacles=[...labels,...cars,scene.fieldBounds||(scene.vertical?{x:142,y:182,w:156,h:290}:{x:255,y:166,w:514,h:170}),...(scene.scaleBounds||[])];
-      for(const dx of [p.x>w/2?28:-93,p.x>w/2?-93:28,-32])for(const dy of [-31,13,-55,37,-79,61]){
-        const box={x:clamp(p.x+dx,4,w-69),y:clamp(p.y+dy,4,h-24),w:68,h:23};
-        box.cost=obstacles.reduce((sum,b)=>sum+overlap(box,b)*20,0)+Math.hypot(box.x+32-p.x,box.y+10-p.y);
+      for(const dx of [p.x>w/2?28:-112,p.x>w/2?-112:28,-42])for(const dy of [-39,15,-71,47,-103,79]){
+        const box={x:clamp(p.x+dx,4,w-88),y:clamp(p.y+dy,4,h-32),w:88,h:32};
+        box.cost=obstacles.reduce((sum,b)=>sum+overlap(box,b)*20,0)+Math.hypot(box.x+42-p.x,box.y+14-p.y);
         if(!best||box.cost<best.cost)best=box;
       }
-      const mix=scene.alignMix||0,anchor=pointAt(s.points,0),x=best.x+(20-best.x)*mix,y=best.y+(anchor.y-10-best.y)*mix;labels.push({...best,x,y});node.badge.setAttribute('transform',`translate(${x} ${y})`);
-      node.leader.setAttribute('d',`M${p.x},${p.y} L${x+32},${y+10}`);
+      const mix=scene.alignMix||0,anchor=pointAt(s.points,0),x=best.x+(8-best.x)*mix,y=best.y+(anchor.y-14-best.y)*mix;labels.push({...best,x,y});node.badge.setAttribute('transform',`translate(${x} ${y})`);
+      node.leader.setAttribute('d',`M${p.x},${p.y} L${x+42},${y+14}`);
     });
   }
   function update(scene,options) {
@@ -332,7 +338,8 @@ window.APEX_TRACK = (() => {
       node.item=item;
       node.group.style.setProperty('--team',item.team);node.marker.style.setProperty('--team',item.team);
       node.car.setAttribute('aria-label',`${item.name} · ${item.rank} · ${item.scoreLabel}`);
-      node.badge.lastChild.textContent=`${item.rank} ${item.code}`;
+      if(node.rankText)node.rankText.textContent=item.rank;
+      node.badge.lastChild.textContent=item.code;
       options.metrics.forEach(metric=>{
         let segment=node.parts.get(metric.key);
         if(!segment){segment=svg('path',{class:'circuit-segment','data-segment-metric':metric.key});segment.append(svg('title'));node.parts.set(metric.key,segment);node.segments.append(segment);}
