@@ -21,7 +21,7 @@
     "team_points_share"
   ]);
   const DATA_FILES = {
-    history: "./data/merged_rankable_driver_seasons.json",
+    history: "./data/merged_rankable_driver_seasons.json?v=2",
     profiles: "./data/driver_profiles.json",
     schema: "./data/metric_schema.json?v=5",
     poles: "./data/pole_positions.json",

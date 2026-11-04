@@ -65,6 +65,7 @@ function applyLanguage(language) {
   localStorage.setItem(LANGUAGE_STORAGE_KEY, state.language);
   document.documentElement.lang = state.language === "zh" ? "zh-CN" : state.language;
   $("#language-select").value = state.language;
+  window.APEX_HELP?.render(state.language);
   document.title = `${t("workspaceTitle")} — Apex LineUp`;
   document.querySelector('meta[name="description"]').content = t("methodTitle");
   document.querySelectorAll("[data-i18n]").forEach((element) => { element.textContent = t(element.dataset.i18n); });
@@ -317,9 +318,9 @@ function driverWheel(driver) {
     ${[.25,.5,.75,1].map(scale=>`<polygon class="wheel-grid" points="${polygon(r*scale)}"/>`).join('')}
     ${keys.map((_,i)=>{const p=point(i,r);return `<path class="wheel-axis" d="M210 145L${p.x} ${p.y}"/>`;}).join('')}
     ${path}
-    ${keys.map((key,i)=>{const dot=points[i],p=point(i,83);return `${dot?`<circle cx="${dot.x}" cy="${dot.y}" r="3" fill="${metricColor(key)}"/>`:''}<text x="${p.x}" y="${p.y+3}" class="wheel-index" text-anchor="middle" fill="${metricColor(key)}">${i+1}</text>`;}).join('')}
+    ${keys.map((key,i)=>{const dot=points[i],p=point(i,83);return `${dot?`<circle cx="${dot.x}" cy="${dot.y}" r="3" fill="${metricColor(key)}"/>`:''}<text x="${p.x}" y="${p.y+3}" class="wheel-index" text-anchor="middle" fill="${metricColor(key)}">●</text>`;}).join('')}
     <text x="210" y="284" text-anchor="middle" class="wheel-scale">0–100</text>
-  </svg><div class="wheel-readouts">${keys.map((key,i)=>`<div style="--segment:${metricColor(key)}"><i>${i+1}</i><span>${escapeHTML(metricName(key))}</span><strong class="wheel-number">${escapeHTML(displayValue(key,driver[key]))}</strong></div>`).join('')}</div></div>`;
+  </svg><div class="wheel-readouts">${keys.map((key,i)=>`<div style="--segment:${metricColor(key)}"><i aria-hidden="true">●</i><span>${escapeHTML(metricName(key))}</span><strong class="wheel-number">${escapeHTML(displayValue(key,driver[key]))}</strong></div>`).join('')}</div></div>`;
 }
 
 function driverDetailContent(driver) {
@@ -545,6 +546,7 @@ function renderLineUp({animate = true} = {}) {
   table.classList.toggle("stacked-mode", state.view !== "table");
   table.style.minWidth = state.view === "table" ? `${374 + metrics.length * 112}px` : "";
   updateFilterStatus(state.filteredRanked.length, visibleDrivers.length);
+  window.APEX_REFRESH_METRIC?.();
   state.previousRanks = rankPositions;
   viewport.scrollTop = scrollTop;
   if (table.querySelector(".metric-mini-row")) table.querySelector(".metric-mini-row").scrollLeft = legendScrollLeft;
@@ -1396,22 +1398,26 @@ function bindStudio() {
   document.addEventListener('focusin',e=>{const target=e.target.closest('[data-tooltip]')||e.target.closest('.grandstand-metric')?.querySelector('[data-metric-hint]');if(target)showTip(target);else tooltip.hidden=true;});
   document.addEventListener("focusout", () => { tooltip.hidden = true; });
   document.addEventListener("keydown", e => { if (e.key === "Escape") tooltip.hidden = true; });
-  let highlightedMetric;
-  const highlightMetric = e => {
+  let highlightedMetric, highlightedOrigin;
+  const highlightMetric = (e,force=false) => {
     const origin=e.target.closest('[data-segment-metric],[data-control-metric],[data-toggle-metric],[data-metric]');
     const key=origin&&(origin.dataset.segmentMetric||origin.dataset.controlMetric||origin.dataset.toggleMetric||origin.dataset.metric);
-    if(key===highlightedMetric)return;highlightedMetric=key;
+    highlightedOrigin=origin;
+    if(key===highlightedMetric&&!force)return;highlightedMetric=key;
     document.querySelectorAll('.stack-segment,.circuit-segment').forEach(el=>el.classList.toggle('metric-dimmed',Boolean(key)&&el.dataset.segmentMetric!==key));
     document.querySelectorAll('[data-metric]').forEach(el=>el.classList.toggle('is-linked-metric',Boolean(key)&&el.dataset.metric===key));
     document.querySelectorAll('.grandstand-card').forEach(el=>{
       const active=Boolean(key)&&el.dataset.controlMetric===key;el.classList.toggle('is-linked-metric',active);
-      if(!active||!el.getClientRects().length||origin?.closest('.grandstand-card'))return;
+      if(force||!active||!el.getClientRects().length||origin?.closest('.grandstand-card'))return;
       const scroll=el.closest('#metric-dock,.circuit-grandstand');if(!scroll)return;
       const box=el.getBoundingClientRect(),bounds=scroll.getBoundingClientRect(),smooth=!matchMedia('(prefers-reduced-motion: reduce)').matches;
       if(scroll.id==='metric-dock'&&(box.left<bounds.left||box.right>bounds.right))scroll.scrollTo({left:scroll.scrollLeft+box.left-bounds.left-(bounds.width-box.width)/2,behavior:smooth?'smooth':'instant'});
       else if(scroll.id!=='metric-dock'&&(box.top<bounds.top||box.bottom>bounds.bottom))scroll.scrollTo({top:scroll.scrollTop+box.top-bounds.top-(bounds.height-box.height)/2,behavior:smooth?'smooth':'instant'});
     });
   };
+  window.APEX_REFRESH_METRIC=()=>highlightMetric({target:highlightedOrigin||document.body},true);
+  const metricObserver=new MutationObserver(()=>window.APEX_REFRESH_METRIC());
+  ['#lineup-table','#comparison-chart','#metric-dock'].forEach(selector=>metricObserver.observe($(selector),{childList:true,subtree:true}));
   document.addEventListener('mouseover',highlightMetric);
   document.addEventListener('focusin',e=>{if(!e.target.matches('#lineup-scroll,#comparison-chart'))highlightMetric(e);});
   document.addEventListener('mouseout',e=>{if(!e.relatedTarget)highlightMetric({target:document.body});});

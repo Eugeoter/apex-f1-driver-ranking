@@ -550,3 +550,24 @@
 .race-car { transition:none; }
 .circuit-roster-row { backdrop-filter:none; }
 .race-venue[data-animating="true"] .circuit-driver { transition:none; }
+
+/* Stable Latin metrics and fixed line boxes across all UI languages. */
+html:lang(en),html:lang(zh-CN),html:lang(ja),html:lang(ko),html:lang(fr),html:lang(hi) { font-family:"Segoe UI",Arial,"Microsoft YaHei","Yu Gothic","Malgun Gothic","Nirmala UI",sans-serif; }
+button,input,select { line-height:1.2; }
+/* The 38px LineUp row has 31px of usable height: keep both text lines inside it. */
+.lineup-row .driver-info { display:grid; grid-template-rows:16px 16px; gap:4px; min-width:0; align-content:center; }
+.lineup-row .driver-info strong { height:16px; line-height:16px; margin:0; }
+.lineup-row .driver-info strong a { display:block; line-height:inherit; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.lineup-row .driver-info strong a span { line-height:inherit; }
+.lineup-row .driver-info .driver-identity { margin:0; height:16px; min-height:0; line-height:16px; align-items:center; overflow:hidden; }
+.stacked-row .driver-info { grid-template-rows:14px 13px; gap:2px; }
+.stacked-row .driver-info strong { height:14px; line-height:14px; }
+.stacked-row .driver-info .driver-identity { height:13px; line-height:13px; }
+.detail-identity .driver-identity { min-height:16px; line-height:16px; margin:0; align-items:center; }
+.driver-identity img { display:block; flex-shrink:0; object-fit:contain; }
+.grandstand-name { line-height:12px; }
+.wheel-readouts i { line-height:12px; }
+.help-panel { position:fixed; top:54px; right:12px; z-index:80; width:min(550px,calc(100vw - 24px)); max-height:calc(100dvh - 70px); overflow:auto; background:#111b24; border:1px solid #526371; border-top:2px solid #f00827; border-radius:6px; padding:16px; box-shadow:0 12px 35px #0009; font-size:12px; line-height:1.6; }
+.help-panel h2 { margin:0 32px 12px 0; font-size:16px; }.help-panel h3 { font-size:12px; margin:14px 0 4px; color:#b8cbd9; }.help-panel p { margin:5px 0; }.help-panel a { color:#8ddcf4; }.help-panel code { color:#f5d779; white-space:normal; }.help-panel button { position:absolute; right:10px; top:10px; }
+.workspace-toolbar { padding-right:128px; }
+@media(max-width:720px){.workspace-toolbar {padding-right:0;}.workspace-toolbar #shape-toggle {margin-right:120px;}}

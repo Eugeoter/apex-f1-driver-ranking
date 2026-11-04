@@ -61,3 +61,9 @@ The compact profile places a small steering-wheel radar beside six numbered raw-
 The view switch uses only circuit, stacked-bar and table icons, with localized accessible names and hover hints. The horizontal grandstand strip has a fixed seat zone and separate control deck; both traditional LineUp and Driver stats use it.
 
 Rank animations batch geometry reads before writes and animate transforms instead of widths/left offsets. New edits capture rendered segment positions, so interrupted motion continues from the displayed state. Zero-width contributions collapse without changing adjacent layout. Slider easing is not restarted by unrelated repaints; comparison updates are coalesced onto the next frame rather than delayed until browser idle. Circuit repainting skips unchanged lane paths and contributions, and shape changes capture the current race rather than jumping to its final positions first.
+
+## Finish-rate correction and help
+
+Historical records with no retirement reason were previously counted as finishes even when their result was DNS, DNQ or DNPQ. Recomputed 446 affected F1DB driver-season records from the bundled race-results archive and updated the importer. Finish rates now remain in [0, 1]; period-level normalization no longer uses invalid rates as its upper bound. OpenF1 rows are unchanged.
+
+The help icon documents the bundled sources, aggregation, normalization, missing values and weighted contributions in concise Chinese/English. Radar axes use color dots instead of ordinal numbers. Metric highlighting reapplies after DOM replacement, including newly visible cars. Shared font fallbacks and explicit identity line boxes prevent language-dependent vertical drift.
