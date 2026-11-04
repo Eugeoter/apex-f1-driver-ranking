@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const context={window:{},fetch:async url=>({ok:true,json:async()=>JSON.parse(fs.readFileSync(path.join(root,url.split('?')[0]),'utf8'))})};
+vm.createContext(context);
+vm.runInContext(fs.readFileSync(path.join(root,'static-data.js'),'utf8'),context);
+const metadata=await context.window.APEX_STATIC_DATA.metadata();
+const lineup=await context.window.APEX_STATIC_DATA.lineup(metadata.default_year);
+const body=JSON.stringify({metadata,lineup});
+fs.writeFileSync(path.join(root,'data/startup.json'),body);
+console.log(`Startup snapshot: ${lineup.drivers.length} drivers; ${body.length} characters`);

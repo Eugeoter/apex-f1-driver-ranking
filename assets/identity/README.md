@@ -5,3 +5,5 @@
 - Exact downloaded URLs and byte counts are recorded in `sources.json`.
 
 Team mappings are explicit. Historic teams without a verified corresponding asset retain their names; they are not assigned a successor team's badge. Country flags correspond to the dataset's nationality codes using present-day country identifiers, not historical flag variants. Alternative codes such as NED/NLD and GER/DEU share the same flag.
+
+The UI embeds losslessly decoded PNG copies of these team marks in `TEAM_BADGE_IMAGES` in `app.js`, avoiding per-logo requests and broken-image placeholders. Original WebP files and source attribution remain available here.

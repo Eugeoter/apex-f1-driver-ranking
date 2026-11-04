@@ -13,7 +13,13 @@ window.APEX_TRACK = (() => {
     Object.entries(attrs).forEach(([k,v]) => node.setAttribute(k,v));
     return node;
   };
-  const path = points => points.map((p,i)=>`${i?'L':'M'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+  const pathCache=new WeakMap();
+  function coordinates(points) {
+    let cached=pathCache.get(points);
+    if(!cached){cached=points.map(p=>`${p.x.toFixed(2)},${p.y.toFixed(2)}`);pathCache.set(points,cached);}
+    return cached;
+  }
+  const path = points => 'M'+coordinates(points).join(' L');
   function pointAt(points, progress) {
     const n = clamp(progress,0,1)*(points.length-1), i = Math.min(points.length-2,Math.floor(n)), f = n-i;
     return {x:points[i].x+(points[i+1].x-points[i].x)*f,y:points[i].y+(points[i+1].y-points[i].y)*f};
@@ -21,10 +27,11 @@ window.APEX_TRACK = (() => {
   function slice(points, start, end) {
     start=clamp(start,0,1);end=clamp(end,0,1);
     if (end-start < .000001) return '';
-    const result = [pointAt(points,start)];
-    for(let i=Math.floor(start*SAMPLES)+1;i<end*SAMPLES;i++) result.push(points[i]);
-    result.push(pointAt(points,end));
-    return path(result);
+    const first=pointAt(points,start),last=pointAt(points,end),cached=coordinates(points);
+    const result=[`M${first.x.toFixed(2)},${first.y.toFixed(2)}`];
+    for(let i=Math.floor(start*SAMPLES)+1;i<end*SAMPLES;i++)result.push('L'+cached[i]);
+    result.push(`L${last.x.toFixed(2)},${last.y.toFixed(2)}`);
+    return result.join(' ');
   }
   function geometry(lane, vertical = false, width = 1024) {
     const w = vertical ? 660 : width, h = vertical ? 440 : 500;
@@ -282,7 +289,9 @@ window.APEX_TRACK = (() => {
   function draw(scene,states) {
     scene.lastStates=states;
     const visual=states.map(s=>{
-      const to=scene.alignKey?alignedGeometry(s.item.lane,scene.vertical,scene.w):s.points;
+      const layoutKey=`${s.item.lane}:${scene.vertical}:${scene.w}`;
+      if(scene.alignKey&&s.node.alignedLayout!==layoutKey){s.node.alignedLayout=layoutKey;s.node.alignedPoints=alignedGeometry(s.item.lane,scene.vertical,scene.w);}
+      const to=scene.alignKey?s.node.alignedPoints:s.points;
       const offsets=s.orderKey===scene.alignKey&&s.orderOffsets?s.orderOffsets:metricOffsets(scene.options.metrics,s.values,scene.alignKey);
       const transition=scene.alignTransition,from=transition?.from.get(s.item.key);
       const points=from?interpolate(from.points,to,transition.progress):to;
@@ -385,7 +394,6 @@ window.APEX_TRACK = (() => {
     scene.host.setAttribute('aria-label',options.label);
     paintStands(scene);
     scene.options={...options,windowMotion:0};
-    if(!duration)draw(scene,targets.filter(s=>s.opacity>0));
   }
   function render(host,id,options) {
     const key=`${id}-${options.vertical?'v':'h'}`;

@@ -317,5 +317,10 @@
     };
   }
 
-  window.APEX_STATIC_DATA = {metadata, lineup};
+  // Generated with this engine; defer historical sources until a range changes.
+  async function bootstrap() {
+    try { return await readJson('./data/startup.json?v=1'); }
+    catch (_) { return {metadata:await metadata(),lineup:await lineup('all')}; }
+  }
+  window.APEX_STATIC_DATA = {metadata, lineup, bootstrap};
 })();

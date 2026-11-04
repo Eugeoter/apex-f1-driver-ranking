@@ -95,3 +95,17 @@ Outgoing driver loops now fade in place over 160 ms, with a fixed exit deadline.
 ### Portrait markers and metric alignment
 - Clicking a grandstand opens its metric on a common straight baseline; clicking the same stand again restores the circuit. Checkboxes still control metric inclusion independently.
 - Car identity badges include the existing driver portrait, with a silhouette fallback, in both circuit orientations and aligned lanes. The collision bounds include the portrait.
+
+## Loading and interaction performance
+
+The public page loads `data/startup.json` directly, avoiding failed API probes and historical aggregation on first paint. It contains metadata and the default all-years ranking, produced by the same static engine. Other year ranges load historical sources on demand. Regenerate it after changing source data or scoring rules:
+
+```
+node scripts/build_startup.mjs
+```
+
+Bump the startup query version in `static-data.js` and `index.html` when publishing regenerated data. The standard public build regenerates this snapshot automatically. Keep the raw datasets for range selection and as a fallback if the snapshot is unavailable.
+
+The first table/list batch is 40 drivers; scrolling loads more. Weight controls skip unchanged values, structural metric highlights are coalesced once per frame, hidden main-view tracks do not animate during comparisons, and SVG paths reuse formatted coordinates while geometry stays fixed. Ranking, weights, and normalization rules are unchanged.
+
+Team badges are embedded PNG versions of the existing official assets. This removes separate badge requests and avoids broken-image placeholders; a failed decode falls back to the team name.

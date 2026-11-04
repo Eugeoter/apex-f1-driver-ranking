@@ -5,7 +5,7 @@ const METRIC_KEYS = window.APEX_I18N.metricKeys;
 const LANGUAGE_STORAGE_KEY = "apex-lineup-language-v2";
 const WEIGHT_MAX = 100;
 const WEIGHT_STEP = 0.1;
-const INITIAL_RENDER_LIMIT = 100;
+const INITIAL_RENDER_LIMIT = 40;
 const RENDER_BATCH = 100;
 
 // Recommendation entries require a published numeric weight table for these exact metrics.
@@ -19,6 +19,8 @@ const METRIC_COLORS = ["#fa4e55", "#86d9ff", "#ff8b4d", "#ffc24b", "#fae065", "#
 function metricColor(key) { return METRIC_COLORS[Math.max(0, METRIC_KEYS.indexOf(key)) % METRIC_COLORS.length]; }
 const COUNTRY_REGIONS = {ARG:"AR",AUS:"AU",AUT:"AT",BEL:"BE",BRA:"BR",CAN:"CA",CHE:"CH",CHL:"CL",CHN:"CN",COL:"CO",CZE:"CZ",DEN:"DK",DEU:"DE",DNK:"DK",ESP:"ES",FIN:"FI",FRA:"FR",GBR:"GB",GER:"DE",HUN:"HU",IDN:"ID",IND:"IN",IRL:"IE",ITA:"IT",JPN:"JP",LIE:"LI",MAR:"MA",MCO:"MC",MEX:"MX",MON:"MC",MYS:"MY",NED:"NL",NLD:"NL",NZL:"NZ",POL:"PL",PRT:"PT",RUS:"RU",SWE:"SE",THA:"TH",URY:"UY",USA:"US",VEN:"VE",ZAF:"ZA",ZWE:"ZW"};
 const TEAM_MARKS = {"Mercedes":"mercedes","Ferrari":"ferrari","Red Bull Racing":"redbullracing","Red Bull":"redbullracing","McLaren":"mclaren","Racing Bulls":"racingbulls","Alpine":"alpine","Haas F1 Team":"haasf1team","Haas":"haasf1team","Audi":"audi","Williams":"williams","Aston Martin":"astonmartin","Cadillac":"cadillac"};
+// Embedded PNG marks avoid extra requests and stale/missing image responses.
+const TEAM_BADGE_IMAGES = {"alpine":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAA/klEQVR42u2XQRKDIAxFPx3vVXqypidDT5ZuHMdpQQHDiM5/SwWF5BEjQAghhBBCukJVvaoG/Ud+xw4dLl4AvK8aedENrqjMpj5dKKSqHkC4pTJd65OhzJpkhh4n+a4AfOT2B8AYuT71rkyYzwKa6jNHzxsrE3Y2GKyjJ4YlUjI2KaapN6wyPjLeVp9I9MTC94Lx4XC1KE1niTLN9ElFr3LTSWUs9HGxSCRqNBI1es3WImvm7s2ZcqPXI1LVk3TCki037+RZcVRqNTv0HOfcq2UjFowKxvGPl2WJbFF9rHt3b/jMoiwOuS9K/GiPJk62ap1bKHOKPoQQQgghN+ULjpHVFtGMneEAAAAASUVORK5CYII=","astonmartin":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABRklEQVR42u2W4XGDMAyF9TJBRmEDzAQdCZgMd4Ns5P6olXtRbJq2pO313nfH2ciWJUtCiZkQQgghhBBCiN8BpZRkZunQQ4GlJX+GLSulbEdHpZSydJw/3I5nYDOz9RO6o5m9/oEKyngwtTms+zuPFmUAskee50GHiTZYxj6MZrYCyCc/nOo2Nw6/O7jun8Oe3NHxMp13nN8LWLQ9AXifd+rXSyR3HPT5UN8vD6R7qPsGkl1InnYuYxSs1Z03Mzu1OgiAKUSBx5nWXoLxOYxcmmfSOdfR5TM52sx+jfrEzjcz8EFnydUYZycBWGg9cTA63SfxWv0+bjIfHT20ddVn83ZZ3xO3S3ac9/la0L0+P9K73GG6SIr9P+xJDcdZf/nq7wQOuAzX+Qhg8nLyMqCL3bXjp5XKd0uslzX9exNCCCGEEEKI/8IbtUL9zv0Zg8YAAAAASUVORK5CYII=","audi":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABe0lEQVR42u1WQXLEIAwT+Vjcl4V9mcnL6AW2jheCnR56qDWzswwRsuMYARAIBAKBQCAQCAT+K5KeqLUSAAKwtykCUACcAJBSyop7CB4AvDRvwv21JgbJ53oFt59ErrWSmucH3AuvxTdprpLnVgXLC2ZHIayabODl2cO86rlVoElAMnLZEP8z1x7FsZhXielWcGhaivgTXwiQsfqsx3dVanug3rQQ9+LJ8SKPrpm3tx2lVIzOdbb/IlxibHFX1zgmNOou07VXxRS57lsTLpb2Gb3IJNiugpVZJdVUcRwBBQA27wJHkPJAG8r/V6DNGehD/Kb1SI3Pm1bQB1cx5lG2Jrx8Y9l3uk0GeInNlr1fyrUfxY7mBzaaV47V11h83WGjV+7Dg6w6DrJs9PXqTn4gkg3+Ww1cNvLIwWXdLWlglYfsY9Xv8hZ5iB4+FZfUsxH3sWZK6Wv1ifQN8N3Pi4vY8PLWN7NDk1eaZlgXtSTprzQDgUAgEAgEAoGAG9/E4XbxKyh4IgAAAABJRU5ErkJggg==","cadillac":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABvUlEQVR42u2WO07DQBCG/0E+AAUKLSVCFJyA2CfgSLs+AWfhBF7fwAUHoKWjoB8K1tHY2pfXSRFpviaRnew8/9kBFEVRFEVRFEWphJjZAjAA3BX53frPHgDAzAP/016D997XAQAaEUkLwPggzOo//Q57RwBPwfIT3Vc4b4M+MbP1kVlRkRlbmanQWYtzuZxB+nhKwsrg4CvRiT7by9kqwMwMwBFRNz9rMob3MkpjkXYotTO3zCgfNoEfxTI/VrbRkApwQ6WD9mMVMKtxBQA9EbkKwfUF4zCHi3xfakD2WaYai8NTgfmpljrnocDGBOANQEtElKuA8wb7wDiNOfmaeH1DRLaictL2VywJKRG/nGkK1d7wvZhWlplNqB2bhLAmP05L+Em8e88IuaQi8V0o0rOD0EF6mSJyzPwN4BDJ/sfOCk7zlgCgW+utiTg062DM3QsF+9PthjaSa4xMoIlNQSrYOWTvBSdOpgJjSMQicCMS5bz2ppWIoyOcCntQjsJ59ZZG7wA8i7XhIAMQFShx9iTgknuHdggrFdQngF8Aj6sWagOtOObukosEUBDUUXx3WzOrKIqiKIqiKMrF+QOgey5VNZj1MwAAAABJRU5ErkJggg==","ferrari":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAADCUlEQVR42u1YQc6iMBh9TGbvcIP/CNyAkrCWf++CeACTuUHhJM7GlYuJrk1absB/gl927hxP0NlQrYVCMUX9Z/ySxrRIeY++7/UrwCte8X+HN8KcpG6h0ucAirrP6/ZwAkT5DQEQ3/dLAIjj+DSbzSZJkgQAsNlsytVqdQKA3W43OR6PgStS3kCwVPYl2OVyCQBIkiTYbDYlAMzncwBADRS+75dxHJ/kZJKcgVg+hJQVgcVi8fNwOLzPZrOJOq4DleH7fnk8Hn8o/T+m/+nEAECSWq/XxNUKZL7vJzqAOvYAQAh5C8PwetnI5fmcX15mURRybF8PvbURsyFgGxkAUbdPAJ+UUkEpFX3BGOu9zhgThBA5t1CaU2dhlNJeQCowSqkghAhCiBVZed90Ov0A8MslgUwMCMaYSNNUaG9TEEKs56CUiocQqB9sbLYr8TACQoizZGpdX4G3lWB9b298t2XAOb9yla5gjF1szvMa7mM7j018G7NOybKs6QYOwTsjoHq8Cj7P86sxfZ94GgJRFMHzvPMbbwM/xtsfpAZT8qVpepWweuKqFtrmQKZ5673A2QoYi6qqqs7JaZKTKiv1Ouf83EaXkEnnNsCDIABjrOFknHMURXEXAq1PyPMcSZIgDENQSo03l2XZasNdObHdbn87TQKTfmUh1rcTm8oIAK15UBeQ7mI6nX6Y6h4dXBAExlJCB9s2xhgTyiFq/HKizWFsSbQRcF0H9VqpyQ775CQr1lst1EkeWBRknRWqQf9sFAKmPOgj0FZSmxJ7LP3ffLAB0MiHruOobRl9VxmpKyHvN80zVD7ejatATbu1uqvu93tUVXUeY4x1bl6cc0RRFLn8cjdoFeSJSyamPNh3bVh3cR9XudAlv7GTt1Ham8AYdtWrVbmrdQ7Z2GRfktPBS4nph/vRncd2X5B1kSSglxjqx65HSadTSirwtq90bdceIZ2GlHQSprpIv3ZP1xlEwiaeCfxgEs8I3oqE8uX5qYMQQkyHlAxfKJjq/18N/FlSz2CTr3jFvxx/ARubyK9Ekf9aAAAAAElFTkSuQmCC","haasf1team":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABwUlEQVR42u1Za27DMAiGafcqPVnpyZycjP1Jq8yzHQy4ySQjVU1Vh3y8HwGYNGnSpDMJRzEWEdouX9/L+6GIyyW1ISIsIkl0lHZCXgK4h+i/AndbBD3gAeBxcGwBgHW7vmUxUaMnIvJozbf8nI80KSJ0xOMM8GzJVJH8rD7vziaNWOJI8FQC36np/YcV/CVSABP4htuRRoAQK1RMTA7LcWdioGjts0f7hnrCob7vjBuN66SwWCgwS5H31sBqrfBlkOnZUampde9mjfzMvec53f4fmXJbFirwSB/zf2XabGa2UQKkwLSpsZAvkI0CaNJm0uR6jQDfjQC8Ff4ihRB/gjLjt5aCOx8zCwItWq2HDylHh6KsX/NN16iomJE5rP50DORR2k8dWOhwpKwcosLoeM9+PxoFqcYDAOBeWrFsOH4Jh4gYVsz2Zo9MmxHtS3c77eg2ydoARk1jXAHGlsIWMThZ02t1TMy2de+PpwWJHmzCBu8K+NjNRCMtmjcTLcuesU5UC9KIoS7waLVEnqcrfcu6u6asbpy3WlSuBy00Hvig5o/l7HcFRouwV+s4SpjN5/OZ4rVqXy77mmnSpEmTuugH9NMWPLgnTEUAAAAASUVORK5CYII=","mclaren":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAA7UlEQVR42u2XfQqEIBDFZ8B7rZ4sO5nuydx/DMSl1pWZVHo/CCpCnuObj4gAAAAAAJ4LjxaQUrL51hLR6+LTNxFFZo7DBaeUQr568LeeQI7wEV0rtGxkZqe2gSx6K6wh731m1rSHOkuKPsuDlYR/Rd90CPfCCfkve1cVysK34Y2rSl7TWFHCJI3X1S9MQyksrRLLrlhFJp50VxI6ub2pC1edMuRnK5D0Xr3qHGIlBF+sryf+xlmoFUszsrT4hg0Emh3VEeEG8V5SvJlkX274n1anfQKtRGUfv6r4MHWJ/GEdTyuiOZ4AAAAAADyZDzwIQ+py73bxAAAAAElFTkSuQmCC","mercedes":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAACVklEQVR42u1YW47DIAy0q71X2JOFnAxyMu/H4mqKSIJ5tKtVLFVplQJ+jO3BRLfccsst/0pExOF3/Z0/RwlPUFyfS/oe4W87EUVmjmmNZ2bfc+5jkPKeiEL6PJVlZnXQlpRfiCiISBARp8qn9R+Bi5df8UdKiEgoRSsZIQqztxkBWA5nioOicvE+qJGj8+PoQKder1wjlZEMUyNhVR4iJTWeVThOywmr5zEChmiZI/GorDBERCsRbbVlrwXPae9dS3HNHo+aTXUjY81uSsjsjLXLgNz7Rl2wgS0NtixEtF9F4SoCEbwfO1LINULpMgpfFxvFVKM3a8L/GVJWU8ePSi5UIWkxCju1GULJ+zkZs8AgDkjqLa1bzQaA1ftszM9ko60RWN6VB3wSgZDz99q8AfgRESFtNlc0JXrM/D3tPgA9w6lyqGSuuJGObK0KXdLlo7IJ9wQUX6pStdR96o0MPZvKbqlqrFoWmTlmMJvSB05ZIb4DFvni8fRxhXcBL/lnhjTfEXRhqZFlkwd/BJUTuvxiyJERoIMfngeZ4qZDClHxV1VoCIwwKi2XmxMPB6Qb8Lx0DFdUgbXUjXvnOSdn6UjmqXzXWRCFQG8QHLMMuRsDXv07B1C1EK25UkaYqk2doiH2a+/fVY0s32iGEdrgrLhnaz5gQk9IZE9EyxFx66YSaeMF7su+hw5k/ChYlW/iQnDAmjU1Z8W6lsrU7Xer8mYIneUBzo9KdBoInwMip07YOqcefbiFTooEzhVqO1KIMIKN8oQkxEGWKwy5PuftW2655Zbh8gOkDHhXCFhSKwAAAABJRU5ErkJggg==","racingbulls":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAB60lEQVR42u1YXY7uIAjVybev0pVJV6ZdGfOiGYbgX9VObq4n6UsrLXCOCDVmY2NjY2PjfwIRAZXh4wWKLT21fTMADuwMIGv7VwH8coT6UWXia0JMwRhzxisoz13B9qrYwhsM+AatY+Y+CDuUC95gIJfZblhru3W/KoDjKbuKPIv4rJCYot3QuN71MvmZ6DhmnAjW2lImIbPRr4rddAbczP1gjHFEVAt+2R5IOBUHLvuDWob98IEWSxvWymittAr71DJg5llXKa0F4JV67isBUMHxasswta1QPgziwPFaUKkkFhzPMqYcaDilPKbMZhjQpOaf9D6KnZ/VPkAugFI7UGidSZOe8g4YDYCEJGhCxn1mvZdBrKhCOCCTKgui+YMZVQgr1WkFmhxvOYmveKCknsYt6dMXz8HYQPsMIPtWU+lsaiWstciO/7MwmY3ODAd717GSkZ4N+ZQJmsZAY7bvxvVBzMKnwobLDDjTZmKvZB+UCzP9E2j1fqQajUoHa5tO9FDIgpbSkT2VH5IQyyAKCQRG/aHJijmDxhjP1hxMckFIB9i92xhzl1j4tAzZMQsQHXZC86XR7452R7QFNkbe1trAnLuT4+l9MfDQMlrmaj/X+6P/lkIma/97KvTDrH78Ncc3NjY2Njb+JXwD2nLWq9o8GcsAAAAASUVORK5CYII=","redbullracing":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAABkklEQVR42u2XUZLDIAiGIbP3ijlZyMm0J2Mfqh3KitEk3c3O8M102lQDv4CRADiO4ziO4zjOX4GfMMrMIf8s3wkAABHTraPBzIGZSSxAjlEZv7P4MJih24inE2V2ac1+LOrWws/4lheRn9CA8HIPH63rIzaEb6pFI3ZEzIIGM1eII3by/GCJo4bwaAgfiqIKQsuu9TQLVvTJSFXkNt0RVJHvJRraAgDAZNUYAMR8EO1tMj2+DsztIQDAqoLzU9dOOkeixdaTxchYPOAjHt2oVq3qa2rYpcEFvI1ru1NlDbpf2RrjZWxRJTQb8UmixJZ8/1bx2c1UORxWJTABwIKIqJxKUUEvrpKFOc8rcyIikqjnlO3rz6N16n+pUy0K4XOlg1yFwSQ21FzLEDMHREzZ6UNvZBGwTXy/+RTayn8rM7+6W8wTZOQ3q/3NQmarxJRjyhF+iTCEFd/F57LTnpdMPnWaR/NA73RFM9fbV4mWPV7amo8KuOs7AdUyUhZ3pvv81VdKUSL/65XScRzHcRzHcYb4BvbohivH9uylAAAAAElFTkSuQmCC","williams":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAA9klEQVR42u2YSw6DMAxE7YiDkZPVPVm4WbphUUFB/gXaap7EBjxoRmQCgggAAAAAAPwP/RxR6Nt6qLS9d+l6dveYssMb54WIHsrxhZl3AUqi+TbQPDFz/XS+JJkXIpoN87PFPBHVowslybzFDDHzcmZqw3Odzw/gMf/GrDQvw3ahbkOMO4+qU+Wq0lqf2lFpUwJYS+sor7Yf9gDBdd+ipY12YDRi9cvRt2kii3bdf2UAZmaPriR6qDdpUzogUe2dASRDe1eAlqV1dydS4m3xIlov5edL61xCkq29MoCM0F4VoI38IeBhsqxPxUdWdeoAAAAAAICDFy69tR4a6v6UAAAAAElFTkSuQmCC"};
 
 
 const state = {
@@ -139,13 +141,14 @@ function clamp(value, min, max) {
 
 function rankDrivers(weights, enabled = state.enabled) {
   if (!state.dataset) return [];
+  const activeMetrics=(state.scoringMetrics||state.dataset.metrics)
+    .filter(metric=>enabled[metric.key]!==false&&Number(weights[metric.key])>0)
+    .map(metric=>[metric.key,Number(weights[metric.key])]);
   return state.dataset.drivers.map((driver) => {
     let weighted = 0;
     let availableWeight = 0;
-    (state.scoringMetrics||state.dataset.metrics).forEach((metric) => {
-      if (enabled[metric.key] === false) return;
-      const value = driver.normalised?.[metric.key];
-      const weight = Number(weights[metric.key] || 0);
+    activeMetrics.forEach(([key,weight]) => {
+      const value = driver.normalised?.[key];
       if (value !== null && value !== undefined && Number.isFinite(Number(value)) && weight > 0) {
         weighted += Number(value) * weight;
         availableWeight += weight;
@@ -298,7 +301,7 @@ function nationalityFlag(driver) {
 function teamBadge(driver) {
   const team = driver.team_name || t("teamFallback");
   const mark = TEAM_MARKS[team];
-  return mark ? `<img class="team-mark" src="./assets/identity/${mark}.webp" alt="${escapeHTML(team)}" title="${escapeHTML(team)}" width="28" height="20">` : `<span class="team-fallback" title="${escapeHTML(team)}">${escapeHTML(team)}</span>`;
+  return mark ? `<img class="team-mark" src="${TEAM_BADGE_IMAGES[mark]}" alt="${escapeHTML(team)}" title="${escapeHTML(team)}" width="28" height="20">` : `<span class="team-fallback" title="${escapeHTML(team)}">${escapeHTML(team)}</span>`;
 }
 function driverIdentity(driver) { return nationalityFlag(driver) + teamBadge(driver); }
 
@@ -442,6 +445,9 @@ function renderWeightValuesOnly() {
   const total=state.dataset.metrics.reduce((n,m)=>n+(state.enabled[m.key]!==false?Number(state.weights[m.key]||0):0),0)||1;
   document.querySelectorAll('.weight-control').forEach(control=>{
     const key=control.dataset.controlMetric, value=Number(state.weights[key]||0), active=state.enabled[key]!==false;
+    const signature=`${state.language}:${value}:${active}:${total}`;
+    if(control.dataset.weightSignature===signature)return;
+    control.dataset.weightSignature=signature;
     const slider=control.querySelector('[data-weight]'), number=control.querySelector('[data-weight-input]');
     window.APEX_MOTION.slider(slider,value,Number(slider.value),document.activeElement!==slider);
     if(document.activeElement!==number)number.value=formatWeight(value);
@@ -594,7 +600,7 @@ function raceOptions(setup, filtered, ranking, vertical, animate = true) {
   const reference=state.scenarios[0];
   const referenceRanks=vertical?new Map(scenarioRanking(reference).map((driver,i)=>[driverKey(driver),driver.availableWeight>0?i+1:null])):null;
   return {
-    drivers:filtered, vertical, animate:animate && !state.shapeMorphing,
+    drivers:filtered, vertical, animate:animate && !state.shapeMorphing && (!state.overview || vertical),
     controlsSignature:state.language+state.dataset.year+state.dataset.metrics.map(m=>m.key).join(","), renderMetric:metricControl, syncControls:renderWeightValuesOnly,
     onFocus:key=>{if(vertical&&state.overview){state.traceDriver=key;renderRankTrace();}},
     comparisonTitle:vertical?t('rankComparedTo',{name:scenarioName(reference)}):'',
@@ -895,8 +901,6 @@ function scheduleInteractiveRender() {
 }
 
 function renderAll({preserveWeightDOM = false} = {}) {
-  if (preserveWeightDOM) renderWeightValuesOnly();
-  else renderWeights();
   renderLineUp();
   renderCode();
   requestComparisonRender();
@@ -947,9 +951,14 @@ async function loadSeason(year, {resetScenarios = true} = {}) {
   const table = $("#lineup-table");
   table.innerHTML = `<div class="loading">${escapeHTML(t("loadSeason", {year}))}</div>`;
   try {
+    if (state.staticSource) {
+      state.dataset=state.startupLineup&&String(year)===String(state.startupLineup.year)
+        ? structuredClone(state.startupLineup) : await window.APEX_STATIC_DATA.lineup(year);
+    } else {
     const response = await fetch(`./api/lineup?year=${encodeURIComponent(year)}`);
     if (!response.ok) throw new Error(t("loadSeasonFailed", {year}));
     state.dataset = await response.json();
+    }
   } catch (apiError) {
     if (!window.APEX_STATIC_DATA) throw apiError;
     state.dataset = await window.APEX_STATIC_DATA.lineup(year);
@@ -1193,8 +1202,10 @@ function bindEvents() {
     }
     if (event.target.closest("[data-load-more]")) loadMoreDrivers();
   });
-  $("#lineup-table").addEventListener("error", (event) => {
+  document.addEventListener("error", (event) => {
+    if(typeof event.target?.matches!=='function')return;
     if (event.target.matches(".driver-portrait img")) event.target.closest(".driver-portrait").classList.add("no-photo");
+    if(event.target.matches('.team-mark')){const label=document.createElement('span');label.className='team-fallback';label.textContent=event.target.alt;label.title=event.target.alt;event.target.replaceWith(label);}
   }, true);
   document.addEventListener("input", (event) => {
     const slider = event.target.closest("[data-weight]");
@@ -1450,7 +1461,11 @@ function bindStudio() {
     });
   };
   window.APEX_REFRESH_METRIC=()=>highlightMetric({target:highlightedOrigin||document.body},true);
-  const metricObserver=new MutationObserver(()=>window.APEX_REFRESH_METRIC());
+  let metricRefreshFrame=0;
+  const metricObserver=new MutationObserver(records=>{
+    if(metricRefreshFrame||!records.some(r=>[...r.addedNodes].some(n=>n.nodeType===1)))return;
+    metricRefreshFrame=requestAnimationFrame(()=>{metricRefreshFrame=0;window.APEX_REFRESH_METRIC();});
+  });
   ['#lineup-table','#comparison-chart','#metric-dock'].forEach(selector=>metricObserver.observe($(selector),{childList:true,subtree:true}));
   document.addEventListener('mouseover',highlightMetric);
   document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.grandstand-metric')){e.preventDefault();e.target.click();}});
@@ -1478,9 +1493,14 @@ async function initialise() {
   }});
   try {
     try {
+      if(document.documentElement.dataset.source==='static') {
+        const startup=await window.APEX_STATIC_DATA.bootstrap();
+        state.staticSource=true;state.startupLineup=startup.lineup;state.metadata=startup.metadata;
+      } else {
       const response = await fetch("./api/seasons");
       if (!response.ok) throw new Error(t("fetchUnavailable"));
       state.metadata = await response.json();
+      }
     } catch (apiError) {
       if (!window.APEX_STATIC_DATA) throw apiError;
       state.metadata = await window.APEX_STATIC_DATA.metadata();
