@@ -36,6 +36,9 @@ const state = {
   search: "",
   filters: {team: "all", country: "all", era: "all", achievement: "all", minStarts: 0},
   view: "stacked",
+  shape: localStorage.getItem("apex-ranking-shape") === "lineup" ? "lineup" : "circuit",
+  shapeMorphing: false,
+  traceDriver: null,
   zoom: {lineup: 1, compare: 1},
   previousRanks: new Map(),
   expandedDrivers: new Set(),
@@ -87,12 +90,7 @@ function updateSeasonNote(selection) {
   const bounds = selectionBounds(selection);
   if (!bounds) return;
   const period = bounds[0] === bounds[1] ? String(bounds[0]) : `${bounds[0]}–${bounds[1]}`;
-  const button = $("#period-toggle");
-  let label = button.querySelector('.period-label');
-  if (!label) { label = document.createElement('span'); label.className = 'period-label'; button.append(label); }
-  label.textContent = period;
-  button.title = `${t("yearRange")}: ${period}`;
-  button.setAttribute('aria-label', button.title);
+  $('#filters-toggle').title = `${t("filters")} · ${period}`;
 }
 
 function escapeHTML(value) {
@@ -188,8 +186,9 @@ function resetDriverFilters({render = true} = {}) {
   if ($("#achievement-filter")) $("#achievement-filter").value = "all";
   if ($("#min-starts-filter")) $("#min-starts-filter").value = "0";
   if (render && state.dataset) {
-    renderLineUp({animate: false});
+    renderLineUp({animate: true});
     requestComparisonRender();
+    animateFilteredView();
   }
 }
 
@@ -246,7 +245,7 @@ function updateFilterStatus(total, shown) {
   const badge = $("#active-filter-count");
   badge.textContent = String(count);
   badge.hidden = count === 0;
-  $("#filter-toggle").classList.toggle("active", count > 0);
+  $("#filters-toggle").classList.toggle("has-filters", count > 0);
 }
 
 function displayValue(key, value) {
@@ -300,86 +299,44 @@ function driverCell(driver) {
   const profileUrl = safeExternalUrl(driver.profile?.profile_url);
   const name = escapeHTML(driver.full_name);
   const link = profileUrl ? `<a href="${escapeHTML(profileUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHTML(t("openProfile", {name: driver.full_name}))}">${name}<span aria-hidden="true">↗</span></a>` : name;
-  return `<div class="driver-cell"><button class="driver-drag" type="button" data-drag-driver="${driverKey(driver)}" aria-label="${escapeHTML(t("dragDriver", {name:driver.full_name}))}" title="${escapeHTML(t("dragDriver", {name:driver.full_name}))}">⠿</button><button class="driver-expand" type="button" data-expand-driver="${driverKey(driver)}" aria-expanded="${expanded}" aria-label="${escapeHTML(t(expanded ? "collapseDriver" : "expandDriver", {name: driver.full_name}))}"><span aria-hidden="true">▾</span></button>${driverPortrait(driver)}<span class="driver-info"><strong>${link}</strong><small class="driver-identity">${driverIdentity(driver)}</small></span></div>`;
+  return `<div class="driver-cell"><button class="driver-expand" type="button" data-expand-driver="${driverKey(driver)}" aria-expanded="${expanded}" aria-label="${escapeHTML(t(expanded ? "collapseDriver" : "expandDriver", {name: driver.full_name}))}"><span aria-hidden="true">▾</span></button>${driverPortrait(driver)}<span class="driver-info"><strong>${link}</strong><small class="driver-identity">${driverIdentity(driver)}</small></span></div>`;
+}
+
+function driverWheel(driver) {
+  const keys=['race_starts','championship_points','wins','podiums','finish_rate','average_qualifying_position'];
+  const center={x:210,y:145},r=70;
+  const point=(i,radius)=>{const angle=-Math.PI/2+i*Math.PI/3;return {x:center.x+Math.cos(angle)*radius,y:center.y+Math.sin(angle)*radius};};
+  const points=keys.map((key,i)=>{const value=driver.normalised?.[key];return value==null||!Number.isFinite(Number(value))?null:point(i,r*Math.max(0,Math.min(1,Number(value))));});
+  const polygon=radius=>keys.map((_,i)=>{const p=point(i,radius);return `${p.x},${p.y}`;}).join(' ');
+  const path=points.every(Boolean)?`<polygon class="wheel-value" points="${points.map(p=>`${p.x},${p.y}`).join(' ')}"/>`:points.map((p,i)=>{const next=points[(i+1)%6];return p&&next?`<path class="wheel-value" d="M${p.x},${p.y}L${next.x},${next.y}"/>`:'';}).join('');
+  return `<div class="driver-wheel" title="${escapeHTML(t('normalizedMeaning'))}"><svg viewBox="0 0 420 290" role="img" aria-label="${escapeHTML(driver.full_name+' · '+t('normalizedMeaning'))}">
+    <path class="wheel-rim" d="M80 54Q38 47 28 84L16 196Q17 240 60 243L103 210H317L360 243Q403 240 404 196L392 84Q382 47 340 54L305 76H115Z"/>
+    <path class="wheel-grip" d="M67 80Q47 77 44 101L34 190Q32 214 52 218L79 196L88 105Z M353 80Q373 77 376 101L386 190Q388 214 368 218L341 196L332 105Z"/>
+    <path class="wheel-trim" d="M95 62H325M102 224H318"/>
+    <rect class="wheel-screen" x="112" y="61" width="196" height="170" rx="26"/>
+    ${[.25,.5,.75,1].map(scale=>`<polygon class="wheel-grid" points="${polygon(r*scale)}"/>`).join('')}
+    ${keys.map((_,i)=>{const p=point(i,r);return `<path class="wheel-axis" d="M210 145L${p.x} ${p.y}"/>`;}).join('')}
+    ${path}
+    ${keys.map((key,i)=>{const dot=points[i],p=point(i,83);return `${dot?`<circle cx="${dot.x}" cy="${dot.y}" r="3" fill="${metricColor(key)}"/>`:''}<text x="${p.x}" y="${p.y+3}" class="wheel-index" text-anchor="middle" fill="${metricColor(key)}">${i+1}</text>`;}).join('')}
+    <text x="210" y="284" text-anchor="middle" class="wheel-scale">0–100</text>
+  </svg><div class="wheel-readouts">${keys.map((key,i)=>`<div style="--segment:${metricColor(key)}"><i>${i+1}</i><span>${escapeHTML(metricName(key))}</span><strong class="wheel-number">${escapeHTML(displayValue(key,driver[key]))}</strong></div>`).join('')}</div></div>`;
 }
 
 function driverDetailContent(driver) {
   const profile = driver.profile || {};
   const bio = String(profile.biography || "").trim();
-  const shortBio = bio.length > 400 ? `${bio.slice(0, 397).replace(/\s+\S*$/, "")}…` : bio;
+  const shortBio = bio.length > 180 ? `${bio.slice(0, 177).replace(/\s+\S*$/, "")}…` : bio;
   const profileUrl = safeExternalUrl(profile.profile_url);
-  const stats = [
-    ["profileRaceStarts", driver.race_starts], ["profilePoints", displayValue("championship_points", driver.championship_points)],
-    ["profileWins", driver.wins], ["profilePodiums", driver.podiums],
-    ["profileFinishRate", displayValue("finish_rate", driver.finish_rate)],
-    ["profileQualifying", displayValue("average_qualifying_position", driver.average_qualifying_position)]
-  ];
   const usesWikimedia = profile.portrait_source_name === "Wikimedia" || profile.portrait_source_name === "Generated F1 helmet avatar" && profile.wiki_thumbnail_url;
   const portraitSource = t(usesWikimedia ? "portraitSourceWikimedia" : profile.portrait_source_name === "Generated F1 helmet avatar" ? "portraitSourceGenerated" : "portraitSource");
   const carNumber = driver.driver_number !== null && driver.driver_number !== undefined ? ` / #${escapeHTML(driver.driver_number)}` : "";
   return `<div class="driver-detail-inner" ${state.view === "table" ? `role="cell" aria-colspan="${state.dataset.metrics.length + 3}"` : ""} style="--team:#${escapeHTML((driver.team_colour || "777777").replace("#", ""))}">
       <div class="detail-identity">${driverPortrait(driver, true)}<div><span class="detail-kicker">${carNumber}</span><h4>${escapeHTML(driver.full_name)}</h4><p class="driver-identity">${driverIdentity(driver)}</p></div></div>
       <div class="detail-copy"><p lang="${bio ? "en" : escapeHTML(state.language)}">${escapeHTML(shortBio || t("profileUnavailable"))}</p>${profileUrl ? `<a href="${escapeHTML(profileUrl)}" target="_blank" rel="noopener noreferrer">${escapeHTML(t("visitProfile"))}</a>` : ""}<small>${bio ? `${escapeHTML(t("profileSource"))} · ` : ""}${escapeHTML(portraitSource)}</small></div>
-      <div class="detail-stats">${stats.map(([label, value]) => `<div><strong>${escapeHTML(value ?? "—")}</strong><span>${escapeHTML(t(label))}</span></div>`).join("")}</div>
+      ${driverWheel(driver)}
     </div>`;
 }
 
-function bindDriverDragging() {
-  let drag = null, suppressClickUntil = 0;
-  const accept = (id, target, y) => {
-    if (!target?.closest('#inverse-list')) return;
-    const row = target.closest('[data-inverse-index]');
-    const at = row ? Number(row.dataset.inverseIndex) + Number(y > row.getBoundingClientRect().top + row.offsetHeight/2) : undefined;
-    window.APEX_INVERSE.addDriver(id, at);
-  };
-  const clear = () => {
-    drag?.ghost?.remove(); drag = null;
-    document.querySelectorAll('.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
-  };
-  $('#lineup-table').addEventListener('dragstart', event => {
-    const row = event.target.closest('[data-driver]');
-    if (!row || event.target.closest('a,button')) { event.preventDefault(); return; }
-    event.dataTransfer.effectAllowed = 'copy';
-    event.dataTransfer.setData('application/x-apex-driver', row.dataset.driver);
-    if (studioTool !== 'reverse') openStudioTool("reverse");
-  });
-  $('#lineup-table').addEventListener('pointerdown', event => {
-    const handle = event.target.closest('[data-drag-driver]');
-    if (!handle || event.button !== 0) return;
-    event.preventDefault();
-    drag = {id:handle.dataset.dragDriver, x:event.clientX, y:event.clientY, pointer:event.pointerId, moved:false};
-  });
-  document.addEventListener('pointermove', event => {
-    if (!drag || event.pointerId !== drag.pointer) return;
-    if (!drag.moved && Math.hypot(event.clientX-drag.x,event.clientY-drag.y) < 6) return;
-    event.preventDefault();
-    if (!drag.moved) {
-      drag.moved = true;
-      if (studioTool !== 'reverse') openStudioTool("reverse");
-      drag.ghost = document.createElement('div'); drag.ghost.className = 'driver-drag-ghost';
-      drag.ghost.textContent = state.dataset.drivers.find(d => driverKey(d) === drag.id)?.full_name || '';
-      document.body.append(drag.ghost);
-    }
-    drag.ghost.style.left = `${event.clientX+12}px`; drag.ghost.style.top = `${event.clientY+12}px`;
-    document.querySelectorAll('.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
-    document.elementFromPoint(event.clientX,event.clientY)?.closest('#inverse-list')?.classList.add('is-drop-target');
-  }, {passive:false});
-  document.addEventListener('pointerup', event => {
-    if (!drag || event.pointerId !== drag.pointer) return;
-    const id = drag.id;
-    if (drag.moved) accept(id,document.elementFromPoint(event.clientX,event.clientY),event.clientY);
-    else { if (studioTool !== 'reverse') openStudioTool("reverse"); window.APEX_INVERSE.addDriver(id); }
-    suppressClickUntil = performance.now()+300; clear();
-  });
-  document.addEventListener('pointercancel', clear);
-  document.addEventListener('keydown', event => { if (event.key === 'Escape') clear(); });
-  $('#lineup-table').addEventListener('click', event => {
-    const handle = event.target.closest('[data-drag-driver]');
-    if (!handle || performance.now() < suppressClickUntil) return;
-    if (studioTool !== 'reverse') openStudioTool("reverse");
-    window.APEX_INVERSE.addDriver(handle.dataset.dragDriver);
-  });
-}
 
 function driverDetail(driver) {
   const expanded = state.expandedDrivers.has(driverKey(driver));
@@ -459,50 +416,32 @@ function applyPreset(key, {render = true} = {}) {
   if (render) renderAll();
 }
 
-function renderPresets() {
-  $("#preset-row").hidden = Object.keys(PRESETS).length === 0;
-  $("#preset-row").innerHTML = Object.entries(PRESETS).map(([key, preset]) => (
-    `<button class="preset-chip ${state.activePreset === key ? "active" : ""}" data-tooltip="${escapeHTML(preset.preference + " — " + preset.source)}" data-preset="${key}" type="button">${escapeHTML(presetLabel(key))}</button>`
-  )).join("");
-  document.querySelectorAll("[data-preset]").forEach((button) => {
-    button.addEventListener("click", () => applyPreset(button.dataset.preset));
-  });
+function metricControl(metric) {
+  const key=metric.key, active=state.enabled[key]!==false, value=formatWeight(state.weights[key]||0);
+  const bins=state.metricHistograms.get(key)||[], max=Math.max(1,...bins);
+  return `<div class="grandstand-card weight-control ${active?'':'is-disabled'}" data-control-metric="${key}" style="--segment:${metricColor(key)}">
+    <button class="grandstand-metric" type="button" data-toggle-metric="${key}" aria-pressed="${active}" aria-label="${escapeHTML(t(active?'disableMetric':'enableMetric',{name:metricName(key)}))}"><span class="grandstand-name" data-metric-hint="${escapeHTML(metricDescription(key).split(/[;；]/)[0])}">${escapeHTML(metricName(key))}</span><strong class="metric-share"></strong><span class="grandstand-seats" aria-hidden="true">${bins.map(n=>`<i style="height:${n/max*100}%"></i>`).join('')}</span></button>
+    <div class="grandstand-adjust"><input data-weight="${key}" type="range" min="0" max="${WEIGHT_MAX}" step="${WEIGHT_STEP}" value="${value}" aria-label="${escapeHTML(t('weightAria',{name:metricName(key)}))}"><input data-weight-input="${key}" type="number" min="0" max="${WEIGHT_MAX}" step="${WEIGHT_STEP}" inputmode="decimal" value="${value}" aria-label="${escapeHTML(t('weightInputAria',{name:metricName(key)}))}"><button class="weight-reset" data-reset-metric="${key}" title="${escapeHTML(t('resetMetric',{name:metricName(key),value:DEFAULT_METRIC_WEIGHT}))}" aria-label="${escapeHTML(t('resetMetric',{name:metricName(key),value:DEFAULT_METRIC_WEIGHT}))}">${studioIcon('reset')}</button></div></div>`;
 }
-
 function renderWeights() {
-  if (!state.dataset) return;
-  const scrollTop = $("#weight-list").scrollTop;
-  const previousValues = new Map([...document.querySelectorAll('[data-weight]')].map(input => [input.dataset.weight, Number(input.value)]));
-  document.querySelectorAll('[data-weight]').forEach(input => cancelAnimationFrame(input.motionFrame));
-  $("#weight-list").innerHTML = state.dataset.metrics.map((metric) => {
-    const value = formatWeight(state.weights[metric.key] || 0);
-    const active = state.enabled[metric.key] !== false;
-    const name = escapeHTML(metricName(metric.key));
-    return `<div class="weight-control ${active ? "" : "is-disabled"}" data-control-metric="${metric.key}">
-      <div class="weight-label"><button class="weight-enable" type="button" data-toggle-metric="${metric.key}" aria-pressed="${active}" aria-label="${escapeHTML(t(active ? "disableMetric" : "enableMetric", {name: metricName(metric.key)}))}" title="${escapeHTML(t(active ? "disableMetric" : "enableMetric", {name: metricName(metric.key)}))}" style="--segment:${metricColor(metric.key)}">${active ? "✓" : "+"}</button><label tabindex="0" data-tooltip="${escapeHTML(metricDescription(metric.key))}" for="weight-number-${metric.key}">${name}</label><input id="weight-number-${metric.key}" data-weight-input="${metric.key}" type="number" min="0" max="${WEIGHT_MAX}" step="${WEIGHT_STEP}" inputmode="decimal" value="${value}" aria-label="${escapeHTML(t("weightInputAria", {name: metricName(metric.key)}))}"><button class="weight-reset" type="button" data-reset-metric="${metric.key}" aria-label="${escapeHTML(t("resetMetric", {name: metricName(metric.key), value: formatWeight(DEFAULT_METRIC_WEIGHT)}))}" title="${escapeHTML(t("resetMetric", {name: metricName(metric.key), value: formatWeight(DEFAULT_METRIC_WEIGHT)}))}">${studioIcon("reset")}</button></div>
-
-      <input id="weight-${metric.key}" data-weight="${metric.key}" type="range" min="0" max="${WEIGHT_MAX}" step="${WEIGHT_STEP}" value="${value}" aria-label="${escapeHTML(t("weightAria", {name: metricName(metric.key)}))}">
-    </div>`;
-  }).join("");
-  renderWeightValuesOnly(previousValues);
-  $("#weight-list").scrollTop = scrollTop;
+  if(!state.dataset)return;
+  const dock=$('#metric-dock'), signature=state.language+state.dataset.year+state.dataset.metrics.map(m=>m.key).join(',');
+  dock.hidden=state.shape==='circuit'&&state.view!=='table';
+  if(dock.dataset.signature!==signature){dock.innerHTML=state.dataset.metrics.map(metricControl).join('');dock.dataset.signature=signature;}
+  renderWeightValuesOnly();
 }
-
-function renderWeightValuesOnly(previousValues = null) {
-  document.querySelectorAll("[data-weight]").forEach((input) => {
-    const key = input.dataset.weight;
-    const control = input.closest(".weight-control");
-    const value = formatWeight(state.weights[key] || 0);
-    const active = state.enabled[key] !== false;
-    window.APEX_MOTION.slider(input, Number(value), previousValues?.get(key) ?? Number(input.value), document.activeElement !== input);
-    const numberInput = control.querySelector("[data-weight-input]");
-    if (document.activeElement !== numberInput) numberInput.value = value;
-    control.classList.toggle("is-disabled", !active);
-    const toggle = control.querySelector("[data-toggle-metric]");
-    toggle.setAttribute("aria-pressed", String(active));
-    toggle.setAttribute("aria-label", t(active ? "disableMetric" : "enableMetric", {name: metricName(key)}));
-    toggle.title = toggle.getAttribute("aria-label");
-    toggle.textContent = active ? "✓" : "+";
+function renderWeightValuesOnly() {
+  const total=state.dataset.metrics.reduce((n,m)=>n+(state.enabled[m.key]!==false?Number(state.weights[m.key]||0):0),0)||1;
+  document.querySelectorAll('.weight-control').forEach(control=>{
+    const key=control.dataset.controlMetric, value=Number(state.weights[key]||0), active=state.enabled[key]!==false;
+    const slider=control.querySelector('[data-weight]'), number=control.querySelector('[data-weight-input]');
+    window.APEX_MOTION.slider(slider,value,Number(slider.value),document.activeElement!==slider);
+    if(document.activeElement!==number)number.value=formatWeight(value);
+    control.classList.toggle('is-disabled',!active);
+    const toggle=control.querySelector('[data-toggle-metric]');
+    toggle.setAttribute('aria-pressed',String(active));
+    toggle.setAttribute('aria-label',t(active?'disableMetric':'enableMetric',{name:metricName(key)}));
+    control.querySelector('.metric-share').textContent=active?Math.round(value/total*100)+'%':'—';
   });
 }
 
@@ -537,6 +476,11 @@ function renderLineUp({animate = true} = {}) {
   if (!state.dataset) return;
   const table = $("#lineup-table");
   const viewport = $("#lineup-scroll");
+  const circuit = state.shape === "circuit" && state.view !== "table";
+  table.classList.toggle("circuit-mode", circuit);
+  viewport.classList.toggle("is-circuit", circuit);
+  updateShapeButton();
+  renderWeights();
   const scrollTop = viewport.scrollTop;
   const legendScrollLeft = table.querySelector(".metric-mini-row")?.scrollLeft || 0;
   const before = window.APEX_MOTION.snapshot(viewport, '.lineup-row[data-driver]', 'data-driver');
@@ -559,26 +503,33 @@ function renderLineUp({animate = true} = {}) {
   let header = "";
   let rows = "";
   if (state.view !== "table") {
-    const totalWeight = Math.max(1, metrics.reduce((sum, metric) => sum + (state.enabled[metric.key] === false ? 0 : Number(state.weights[metric.key] || 0)), 0));
-    const histograms = metrics.map((metric, index) => {
-      const active = state.enabled[metric.key] !== false;
-      const bins = state.metricHistograms.get(metric.key) || Array(8).fill(0);
-      const max = Math.max(1, ...bins);
-      const spark = bins.map((count) => `<i style="height:${count / max * 100}%;--segment:${metricColor(metric.key)}"></i>`).join("");
-      return `<button class="metric-mini ${active ? "" : "is-disabled"}" type="button" data-toggle-metric="${metric.key}" aria-pressed="${active}" aria-label="${escapeHTML(t(active ? "disableMetric" : "enableMetric", {name: metricName(metric.key)}))}" title="${escapeHTML(metricName(metric.key) + ": " + metricDescription(metric.key) + " · " + t("histogramMeaning"))}"><span><i style="--segment:${metricColor(metric.key)}"></i>${escapeHTML(metricName(metric.key))}</span><strong>${active ? `${Math.round((Number(state.weights[metric.key] || 0) / totalWeight) * 100)}%` : escapeHTML(t("metricOff"))}</strong><span class="metric-hist" aria-hidden="true">${spark}</span></button>`;
-    }).join("");
-    header = `<div class="stacked-header"><div class="metric-mini-row">${histograms}</div><div class="stacked-title"><span>${escapeHTML(t("rankDriver"))}</span><strong tabindex="0" data-tooltip="${escapeHTML(t("scoreMeaning"))}">${escapeHTML(t("scoreColumn"))}</strong><span>0 — 100</span></div></div>`;
+    header = `<div class="stacked-header"><div class="stacked-title"><span>${escapeHTML(t("rankDriver"))}</span><strong tabindex="0" data-tooltip="${escapeHTML(t("scoreMeaning"))}">${escapeHTML(t("scoreColumn"))}</strong><span>0 — 100</span></div></div>`;
+    if (circuit) {
+      let host = table.querySelector('.race-main-host');
+      if (!host) {
+        table.innerHTML = '<div class="race-main-host"></div>';
+        host = table.querySelector('.race-main-host');
+      } else if (table.querySelector('.stacked-header')) table.querySelector('.stacked-header').remove();
+      table.classList.add('stacked-mode'); table.style.minWidth = '';
+      table.removeAttribute('role'); table.removeAttribute('aria-label');
+      window.APEX_TRACK.render(host, setup.id, raceOptions(setup, state.filteredRanked, state.ranked, false, animate));
+      if (table.querySelector('.metric-mini-row')) table.querySelector('.metric-mini-row').scrollLeft = legendScrollLeft;
+      updateFilterStatus(state.filteredRanked.length, Math.min(8,state.filteredRanked.length));
+      state.previousRanks = rankPositions;
+      viewport.scrollTop = 0;
+      return;
+    }
     rows = visibleDrivers.map((driver) => {
       const info = rowInfo(driver);
-      return `<div class="lineup-row stacked-row ${info.rank <= 3 ? "podium-row" : ""} ${info.changeClass}" data-driver="${driverKey(driver)}" draggable="true" style="--team:${info.team}"><div class="rank-cell">${driver.availableWeight > 0 ? rankLabel(info.rank) : "—"}</div>${driverCell(driver)}<div class="stack-cell">${stackedBar(driver, state.weights, state.enabled)}</div><div class="stack-score"><strong>${scoreLabel(driver)}</strong><small>${info.change > 0 ? `▲${info.change}` : info.change < 0 ? `▼${-info.change}` : " /100"}</small></div></div>${driverDetail(driver)}`;
+      return `<div class="lineup-row stacked-row ${info.rank <= 3 ? "podium-row" : ""} ${info.changeClass}" data-driver="${driverKey(driver)}" style="--team:${info.team}"><div class="rank-cell">${driver.availableWeight > 0 ? rankLabel(info.rank) : "—"}</div>${driverCell(driver)}<div class="stack-cell">${stackedBar(driver, state.weights, state.enabled)}</div><div class="stack-score"><strong>${scoreLabel(driver)}</strong><small>${info.change > 0 ? `▲${info.change}` : info.change < 0 ? `▼${-info.change}` : " /100"}</small></div></div>${driverDetail(driver)}`;
     }).join("");
   } else {
     const columns = metrics.map(() => "minmax(112px, 1fr)");
     const template = `44px 230px 100px ${columns.join(" ")}`;
-    header = `<div class="lineup-row header" style="grid-template-columns:${template}"><div>#</div><div>${escapeHTML(t("driverTeamColumn"))}</div><div>${escapeHTML(t("scoreColumn"))}</div>${metrics.map((metric) => `<div class="metric-heading ${state.enabled[metric.key] === false ? "metric-disabled" : ""}" style="--segment:${metricColor(metric.key)}" tabindex="0" data-tooltip="${escapeHTML(metricDescription(metric.key) + " · " + t("normalizedMeaning"))}">${escapeHTML(metricName(metric.key))} · ${escapeHTML(t("weightPrefix"))}${state.enabled[metric.key] === false ? escapeHTML(t("metricOff")) : formatWeight(state.weights[metric.key] || 0)}</div>`).join("")}</div>`;
+    header = `<div class="lineup-row header" style="grid-template-columns:${template}"><div>#</div><div>${escapeHTML(t("driverTeamColumn"))}</div><div>${escapeHTML(t("scoreColumn"))}</div>${metrics.map((metric) => `<div data-metric="${metric.key}" class="metric-heading ${state.enabled[metric.key] === false ? "metric-disabled" : ""}" style="--segment:${metricColor(metric.key)}" tabindex="0" data-tooltip="${escapeHTML(metricDescription(metric.key) + " · " + t("normalizedMeaning"))}">${escapeHTML(metricName(metric.key))} · ${escapeHTML(t("weightPrefix"))}${state.enabled[metric.key] === false ? escapeHTML(t("metricOff")) : formatWeight(state.weights[metric.key] || 0)}</div>`).join("")}</div>`;
     rows = visibleDrivers.map((driver) => {
       const info = rowInfo(driver);
-      return `<div class="lineup-row ${info.rank <= 3 ? "podium-row" : ""} ${info.changeClass}" data-driver="${driverKey(driver)}" draggable="true" style="grid-template-columns:${template};--team:${info.team}"><div class="rank-cell">${driver.availableWeight > 0 ? rankLabel(info.rank) : "—"}</div>${driverCell(driver)}<div class="score-cell"><strong>${scoreLabel(driver)}</strong><small>${info.change > 0 ? `▲${info.change}` : info.change < 0 ? `▼${-info.change}` : "/100"}</small><span class="score-track"><i style="--score:${(driver.score * 100).toFixed(2)}%"></i></span></div>${metrics.map((metric) => { const normalized = driver.normalised?.[metric.key]; const missing = normalized == null || !Number.isFinite(Number(normalized)); const bar = missing ? 0 : Number(normalized) * 100; return `<div class="metric-cell ${missing ? "is-missing" : ""} ${state.enabled[metric.key] === false ? "metric-disabled" : ""}" data-metric="${metric.key}" style="--segment:${metricColor(metric.key)}" title="${escapeHTML(metricName(metric.key) + ": " + displayValue(metric.key, driver[metric.key]) + " · " + (missing ? t("missingValue") : t("normalizedValue", {value:bar.toFixed(1)})))}"><span>${displayValue(metric.key, driver[metric.key])}</span><span class="metric-track"><i style="--bar:${bar.toFixed(2)}%;--opacity:1"></i></span></div>`; }).join("")}</div>${driverDetail(driver)}`;
+      return `<div class="lineup-row ${info.rank <= 3 ? "podium-row" : ""} ${info.changeClass}" data-driver="${driverKey(driver)}" style="grid-template-columns:${template};--team:${info.team}"><div class="rank-cell">${driver.availableWeight > 0 ? rankLabel(info.rank) : "—"}</div>${driverCell(driver)}<div class="score-cell"><strong>${scoreLabel(driver)}</strong><small>${info.change > 0 ? `▲${info.change}` : info.change < 0 ? `▼${-info.change}` : "/100"}</small><span class="score-track"><i style="--score:${(driver.score * 100).toFixed(2)}%"></i></span></div>${metrics.map((metric) => { const normalized = driver.normalised?.[metric.key]; const missing = normalized == null || !Number.isFinite(Number(normalized)); const bar = missing ? 0 : Number(normalized) * 100; return `<div class="metric-cell ${missing ? "is-missing" : ""} ${state.enabled[metric.key] === false ? "metric-disabled" : ""}" data-metric="${metric.key}" style="--segment:${metricColor(metric.key)}" title="${escapeHTML(metricName(metric.key) + ": " + displayValue(metric.key, driver[metric.key]) + " · " + (missing ? t("missingValue") : t("normalizedValue", {value:bar.toFixed(1)})))}"><span>${displayValue(metric.key, driver[metric.key])}</span><span class="metric-track"><i style="--bar:${bar.toFixed(2)}%;--opacity:1"></i></span></div>`; }).join("")}</div>${driverDetail(driver)}`;
     }).join("");
   }
   // The document stays fixed; only the driver pane scrolls.
@@ -601,6 +552,163 @@ function renderLineUp({animate = true} = {}) {
 
 }
 
+function updateShapeButton() {
+  const button=$('#shape-toggle'),index=state.view==='table'?2:state.shape==='circuit'?0:1;
+  const labels=[t('stackedView'),t('showLineup'),t('tableView')];
+  const icon=['circuit-view','lineup-view','table-view'][index];
+  if(button.dataset.viewIcon!==icon){button.innerHTML=studioIcon(icon);button.dataset.viewIcon=icon;}
+  button.setAttribute('aria-label',labels[index]+' → '+labels[(index+1)%3]);button.title=labels[(index+1)%3];
+  button.removeAttribute('aria-pressed');
+}
+function cycleRankingView(){
+  if(state.shapeMorphing)return;
+  if(state.view==='table'){setView('stacked');if(state.shape!=='circuit')toggleShape();}
+  else if(state.shape==='circuit')toggleShape();
+  else{if(state.overview)setOverview(false);setView('table');animateFilteredView();}
+}
+function animateFilteredView(){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const target=$(state.overview?'#comparison-chart':'#lineup-table');
+  state.filterAnimation?.cancel();
+  state.filterAnimation=target.animate([{opacity:.25,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:380,easing:'cubic-bezier(.22,.7,.2,1)'});
+}
+
+function raceOptions(setup, filtered, ranking, vertical, animate = true) {
+  const changes=window.APEX_MOTION.history(setup,ranking,driverKey,state.dataset.year);
+  const ranks=new Map(ranking.map((driver,i)=>[driverKey(driver),i+1]));
+  const reference=state.scenarios[0];
+  const referenceRanks=vertical?new Map(scenarioRanking(reference).map((driver,i)=>[driverKey(driver),driver.availableWeight>0?i+1:null])):null;
+  return {
+    drivers:filtered, vertical, animate:animate && !state.shapeMorphing,
+    controlsSignature:state.language+state.dataset.year+state.dataset.metrics.map(m=>m.key).join(","), renderMetric:metricControl, syncControls:renderWeightValuesOnly,
+    onFocus:key=>{if(vertical&&state.overview){state.traceDriver=key;renderRankTrace();}},
+    comparisonTitle:vertical?t('rankComparedTo',{name:scenarioName(reference)}):'',
+    offset:setup.raceOffset || 0, onWindow:offset=>{setup.raceOffset=offset;},
+    metrics:state.dataset.metrics.map(m=>({key:m.key,color:metricColor(m.key),name:metricName(m.key),description:metricDescription(m.key),bins:state.metricHistograms.get(m.key)||[],enabled:setup.enabled[m.key]!==false,weight:Number(setup.weights[m.key]||0)})),
+    toggleMetric:key=>{
+      if(setup.id===state.activeScenario)toggleMetric(key);
+      else {setup.enabled[key]=setup.enabled[key]===false;setup.ranking=null;requestComparisonRender();}
+    },
+    toggleLabel:(key,active)=>t(active?'disableMetric':'enableMetric',{name:metricName(key)}),
+    zoomIn:t('circuitZoomIn'), zoomOut:t('circuitZoomOut'), fit:t('circuitFit'),
+    escape:escapeHTML, detail:driverDetailContent, flag:nationalityFlag,
+    label:t('circuitAria'), scoreTitle:t('scoreColumn'), scaleHelp:t('circuitScale'), histogramHelp:t('histogramMeaning'),
+    previous:t('previousGrid'), next:t('nextGrid'), empty:t('inverseNoResults'),
+    segmentTitle:(driver,key,value)=>t('contributionTooltip',{name:metricName(key),raw:displayValue(key,driver[key]),weight:formatWeight(setup.weights[key]||0),points:(value*100).toFixed(1)}),
+    item:(driver,lane)=>({
+      driver, lane, key:driverKey(driver), name:driver.full_name,
+      displayName:vertical?(driver.last_name||driver.full_name.split(' ').at(-1)):driver.full_name,
+      code:driver.name_acronym || driver.full_name.split(' ').at(-1).slice(0,3).toUpperCase(),
+      team:`#${(driver.team_colour||'777777').replace('#','')}`,
+      rank:driver.availableWeight>0?ranks.get(driverKey(driver)):'—',
+      score:clamp(driver.score,0,1), scoreLabel:scoreLabel(driver), scored:driver.availableWeight>0,
+      change:driver.availableWeight>0?changes.get(driverKey(driver))||0:0,
+      comparisonChange:vertical&&driver.availableWeight>0&&referenceRanks.get(driverKey(driver))!=null?referenceRanks.get(driverKey(driver))-ranks.get(driverKey(driver)):null,
+      values:Object.fromEntries(state.dataset.metrics.map(m=>[m.key,setup.enabled[m.key]===false?0:attributeContribution(driver,m,setup.weights)]))
+    })
+  };
+}
+
+function renderRaceComparison() {
+  renderRankTrace();
+  const container=$('#comparison-chart');
+  const layout=window.APEX_TRACK.comparisonLayout(state.scenarios.length,Math.max(100,container.clientWidth-32),Math.max(100,container.clientHeight-56));
+  const {height,width,gap,columns,boardWidth,boardHeight,scale}=layout;
+  const layoutKey=[state.scenarios.length,container.clientWidth,container.clientHeight].join(':');
+  const changed=state.raceComparisonLayoutKey!==layoutKey;
+  const before=new Map([...container.querySelectorAll('.comparison-column')].map(el=>[el.dataset.scenario,el.getBoundingClientRect()]));
+  if(changed){state.raceComparisonLayoutKey=layoutKey;state.zoom.compare=scale;container.scrollLeft=0;container.scrollTop=0;}
+
+  const existing=new Map([...container.querySelectorAll('.race-comparison-host')].map(host=>[host.closest('[data-scenario]').dataset.scenario,host]));
+  container.innerHTML=`<div class="comparison-board circuit-board" style="width:${boardWidth}px;height:${boardHeight}px;grid-template-columns:repeat(${columns},${width}px)"></div>`;
+  const board=container.firstElementChild;board.style.zoom=String(state.zoom.compare);
+  state.scenarios.forEach(setup=>{
+    const name=scenarioName(setup), column=document.createElement('section');
+    column.className='comparison-column';column.dataset.scenario=setup.id;
+    column.style.cssText=`height:${height}px;width:${width}px;--scenario:${setup.color};view-transition-name:${setup.id===state.activeScenario?'ranking-focus':'none'}`;
+    column.setAttribute('aria-label',t('comparisonRankAria',{name}));
+    column.innerHTML=`<div class="comparison-column-head">${studioIcon('flag','column-flag')}<span class="comparison-reference" title="${escapeHTML(t('rankComparedTo',{name:scenarioName(state.scenarios[0])}))}">${setup.id===state.scenarios[0].id?escapeHTML(t('rankReference')):'Δ P'}</span><strong class="scenario-title" data-rename-scenario="${setup.id}" tabindex="0" role="button" title="${escapeHTML(name)}">${escapeHTML(name)}</strong><div class="column-actions"><button data-expand-scenario="${setup.id}" title="${escapeHTML(t('lineupTitle'))}" aria-label="${escapeHTML(t('lineupTitle'))}">${studioIcon('expand')}</button><button data-delete-scenario="${setup.id}" title="${escapeHTML(t('scenarioRemove',{name}))}" aria-label="${escapeHTML(t('scenarioRemove',{name}))}">${studioIcon('close')}</button></div></div>`;
+    const host=existing.get(setup.id)||document.createElement('div');host.className='race-comparison-host';column.append(host);board.append(column);
+    const ranking=scenarioRanking(setup);
+    window.APEX_TRACK.render(host,setup.id,raceOptions(setup,filteredRanking(ranking),ranking,true));
+  });
+  document.querySelector('[data-zoom-controls="compare"] [data-zoom-value]').textContent=`${Math.round(state.zoom.compare*100)}%`;
+  if(changed&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    board.querySelectorAll('.comparison-column').forEach(column=>{
+      const old=before.get(column.dataset.scenario),now=column.getBoundingClientRect(),zoom=state.zoom.compare;
+      column.animate(old?[{transform:`translate(${(old.left-now.left)/zoom}px,${(old.top-now.top)/zoom}px) scale(${old.width/now.width},${old.height/now.height})`},{transform:'none'}]:[{opacity:0,transform:'scale(.92)'},{opacity:1,transform:'none'}],{duration:520,easing:'cubic-bezier(.22,.7,.2,1)'});
+    });
+  }
+  window.APEX_TRACK.prune(state.scenarios.map(s=>s.id));
+}
+
+function renderRankTrace() {
+  const strip=$('#comparison-rank-trace');
+  if(state.shape!=='circuit'||state.scenarios.length<2){strip.hidden=true;return;}
+  strip.hidden=false;
+  const reference=scenarioRanking(state.scenarios[0]);
+  const driver=reference.find(d=>driverKey(d)===state.traceDriver)||filteredRanking(reference)[0];
+  if(!driver){strip.replaceChildren();return;}
+  state.traceDriver=driverKey(driver);
+  const key=state.traceDriver,base=reference.findIndex(d=>driverKey(d)===key)+1;
+  const entries=state.scenarios.map((setup,index)=>{
+    const list=scenarioRanking(setup),position=list.findIndex(d=>driverKey(d)===key),item=list[position];
+    const rank=item?.availableWeight>0?position+1:null,change=rank&&driver.availableWeight>0?base-rank:null;
+    const delta=change==null?'—':change>0?'▲'+change:change<0?'▼'+(-change):'=';
+    return `<button class="rank-journey-node" data-locate-scenario="${setup.id}" data-locate-driver="${key}" title="${escapeHTML(t('locateRankDriver',{name:driver.full_name,setup:scenarioName(setup)}))}"><span>${escapeHTML(scenarioName(setup))}</span><strong>${rank?'P'+rank:'—'}</strong><small class="${change>0?'rank-up':change<0?'rank-down':''}" title="${escapeHTML(t('rankComparedTo',{name:scenarioName(state.scenarios[0])}))}">${index===0?escapeHTML(t('rankReference')):delta}</small></button>`;
+  });
+  strip.innerHTML=`<div class="rank-trace-driver">${nationalityFlag(driver)}<strong>${escapeHTML(driver.full_name)}</strong></div><div class="rank-journey">${entries.join('<span class="rank-journey-arrow" aria-hidden="true">→</span>')}</div>`;
+}
+
+function captureStraightTracks() {
+  const snapshots=new Map();
+  const collect=(root,setup,selector,attribute)=>{
+    if(!root)return;
+    const viewport=root.getBoundingClientRect(), ranking=scenarioRanking(setup), drivers=new Map(ranking.map(d=>[driverKey(d),d]));
+    const visibleTop=Math.max(viewport.top,root.querySelector('.stacked-header')?.getBoundingClientRect().bottom||viewport.top);
+    const rows=[...root.querySelectorAll(selector)].filter(row=>{
+      const rect=row.getBoundingClientRect();return rect.bottom>visibleTop+1&&rect.top<viewport.bottom;
+    }).slice(0,8);
+    rows.forEach(row=>{
+      const driver=drivers.get(row.getAttribute(attribute)), rect=row.querySelector('.stack-track')?.getBoundingClientRect();
+      if(!driver||!rect)return;
+      const values=Object.fromEntries(state.dataset.metrics.map(m=>[m.key,setup.enabled[m.key]===false?0:attributeContribution(driver,m,setup.weights)]));
+      snapshots.set(`${setup.id}:${driverKey(driver)}`,{
+        points:Array.from({length:window.APEX_TRACK.SAMPLES+1},(_,i)=>({x:rect.left+rect.width*i/window.APEX_TRACK.SAMPLES,y:rect.top+rect.height/2})),
+        values,score:driver.score,team:`#${(driver.team_colour||'777777').replace('#','')}`,
+        colors:Object.fromEntries(state.dataset.metrics.map(m=>[m.key,metricColor(m.key)]))
+      });
+    });
+    if(rows.length)setup.raceOffset=Math.max(0,filteredRanking(ranking).findIndex(d=>driverKey(d)===rows[0].getAttribute(attribute)));
+  };
+  if(state.overview)state.scenarios.forEach(setup=>collect(document.querySelector(`[data-scenario="${setup.id}"] .comparison-rows`),setup,'.compare-row','data-flow-driver'));
+  else collect($('#lineup-scroll'),state.scenarios.find(s=>s.id===state.activeScenario),'.lineup-row[data-driver]','data-driver');
+  return snapshots;
+}
+
+function toggleShape() {
+  if(state.shapeMorphing||!state.dataset)return;
+  if(studioTool==='filters')closeStudioTools({restoreFocus:true});
+  const root=$(state.overview?'#compare':'#single-view');
+  window.APEX_TRACK.dismiss();
+  const wasCircuit=state.shape==='circuit';
+  const before=wasCircuit?window.APEX_TRACK.capture(root):captureStraightTracks();
+  state.shape=wasCircuit?'lineup':'circuit';
+  localStorage.setItem('apex-ranking-shape',state.shape);
+  state.shapeMorphing=true;
+  state.visibleLimit=Math.max(INITIAL_RENDER_LIMIT,...state.scenarios.map(s=>(s.raceOffset||0)+8));
+  state.scenarios.forEach(s=>s.visibleLimit=Math.max(INITIAL_RENDER_LIMIT,(s.raceOffset||0)+8));
+  setView('stacked');
+  if(state.overview)renderComparison();
+  if(wasCircuit){
+    if(state.overview)state.scenarios.forEach(setup=>{const list=document.querySelector(`[data-scenario="${setup.id}"] .comparison-rows`);if(list)list.scrollTop=(setup.raceOffset||0)*32;});
+    else $('#lineup-scroll').scrollTop=(state.scenarios.find(s=>s.id===state.activeScenario)?.raceOffset||0)*38;
+  }
+  const after=wasCircuit?captureStraightTracks():window.APEX_TRACK.capture(root);
+  window.APEX_TRACK.morph(before,after,root);
+  setTimeout(()=>{state.shapeMorphing=false;},matchMedia('(prefers-reduced-motion: reduce)').matches?0:820);
+}
+
 function frozenScenario(name, weights, colorIndex, enabled = state.enabled, presetKey = null) {
   return {id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, name, presetKey, weights: {...weights}, enabled: {...enabled}, color: SCENARIO_COLORS[colorIndex % SCENARIO_COLORS.length], ranking: null};
 }
@@ -613,8 +721,9 @@ function scenarioRanking(scenario) {
 }
 
 function initialiseScenarios() {
-  const scenario = frozenScenario(t("customScenario", {number:1}), state.weights, 0, state.enabled);
+  const scenario = frozenScenario("My F1 Ranking", state.weights, 0, state.enabled);
   state.scenarios = [scenario];
+  window.APEX_TRACK.prune([scenario.id]);
   state.activeScenario = scenario.id;
   $("#setup-name").value = scenario.name;
   state.page = 0;
@@ -632,23 +741,21 @@ function svgElement(name, attributes = {}, text = null) {
 
 function requestComparisonRender({force = false} = {}) {
   state.comparisonDirty = true;
-  if (!state.comparisonVisible && !force) return;
-  if (state.comparisonTask) {
-    if ("cancelIdleCallback" in window) window.cancelIdleCallback(state.comparisonTask);
-    else clearTimeout(state.comparisonTask);
-  }
-  const run = () => {
-    state.comparisonTask = 0;
-    if (!state.comparisonDirty) return;
-    if (renderComparison() !== false) state.comparisonDirty = false;
-  };
-  state.comparisonTask = "requestIdleCallback" in window ? window.requestIdleCallback(run, {timeout: 350}) : window.setTimeout(run, 30);
+  if ((!state.comparisonVisible && !force) || state.comparisonTask) return;
+  state.comparisonTask=requestAnimationFrame(()=>{
+    state.comparisonTask=0;
+    if(state.comparisonDirty && renderComparison()!==false)state.comparisonDirty=false;
+  });
 }
 
 function renderComparison() {
   const container = $('#comparison-chart');
   if (container.querySelector('.scenario-rename')) return false;
   if (!state.dataset || state.scenarios.length < 2) { container.replaceChildren(); return; }
+  $('#comparison-rank-trace').hidden=state.shape!=='circuit';
+  $('#compare').classList.toggle('has-rank-trace',state.shape==='circuit');
+  if (state.shape === 'circuit') return renderRaceComparison();
+  if (container.querySelector('.circuit-board')) container.replaceChildren();
   const previous = new Map([...container.querySelectorAll('.comparison-column')].map(column => {
     const list = column.querySelector('.comparison-rows');
     return [column.dataset.scenario, {scrollTop:list.scrollTop, snapshot:window.APEX_MOTION.snapshot(list, '.compare-row', 'data-flow-driver')}];
@@ -769,7 +876,6 @@ function scheduleInteractiveRender() {
 }
 
 function renderAll({preserveWeightDOM = false} = {}) {
-  renderPresets();
   if (preserveWeightDOM) renderWeightValuesOnly();
   else renderWeights();
   renderLineUp();
@@ -818,6 +924,7 @@ async function applyYearRange() {
 }
 
 async function loadSeason(year, {resetScenarios = true} = {}) {
+  const hadDataset=Boolean(state.dataset);
   const table = $("#lineup-table");
   table.innerHTML = `<div class="loading">${escapeHTML(t("loadSeason", {year}))}</div>`;
   try {
@@ -847,6 +954,7 @@ async function loadSeason(year, {resetScenarios = true} = {}) {
   syncPeriodControls(year);
   updateSeasonNote(year);
   renderAll();
+  if(hadDataset)animateFilteredView();
 }
 
 async function importCode() {
@@ -922,11 +1030,8 @@ async function shareSite() {
 }
 
 function setView(view) {
+  window.APEX_TRACK.dismiss();
   state.view = view;
-  ["stacked", "table"].forEach(key => {
-    $("#view-" + key).classList.toggle("active", key === view);
-    $("#view-" + key).setAttribute("aria-pressed", String(key === view));
-  });
   renderLineUp({animate:false});
 }
 
@@ -952,7 +1057,7 @@ function bindViewport(which) {
     scroll.classList.toggle("pan-active", active);
   });
   scroll.addEventListener("wheel", (event) => {
-    if (!state.overview || (event.target.closest(".comparison-rows") && !event.ctrlKey)) return;
+    if (!state.overview || (event.target.closest(".comparison-rows, .race-venue") && !event.ctrlKey)) return;
     event.preventDefault();
     const before = state.zoom[which];
     const bounds = scroll.getBoundingClientRect();
@@ -963,7 +1068,7 @@ function bindViewport(which) {
     scroll.scrollTop = (top + y) * state.zoom[which] / before - y;
   }, {passive: false});
   scroll.addEventListener("pointerdown", (event) => {
-    if (event.target.closest("button, input, a, .comparison-rows, .scenario-title") || (event.button !== 0 && event.button !== 1)) return;
+    if (event.target.closest("button, input, a, .comparison-rows, .scenario-title, .race-venue") || (event.button !== 0 && event.button !== 1)) return;
     dragging = {x: event.clientX, y: event.clientY, left: scroll.scrollLeft, top: scroll.scrollTop};
     scroll.setPointerCapture(event.pointerId);
     scroll.classList.add("is-panning");
@@ -980,6 +1085,8 @@ function bindViewport(which) {
 }
 
 function applyDriverFiltersFromControls() {
+  state.traceDriver=null;
+  state.scenarios.forEach(setup=>{setup.raceOffset=0;});
   state.search = normaliseSearchText($("#driver-search").value.trim());
   state.filters.team = $("#team-filter").value;
   state.filters.country = $("#country-filter").value;
@@ -988,8 +1095,9 @@ function applyDriverFiltersFromControls() {
   state.filters.minStarts = Math.max(0, Math.trunc(Number($("#min-starts-filter").value) || 0));
   state.page = 0;
   state.visibleLimit = INITIAL_RENDER_LIMIT;
-  renderLineUp({animate: false});
+  renderLineUp({animate: true});
   requestComparisonRender();
+  animateFilteredView();
 }
 
 function scheduleFilterUpdate() {
@@ -1027,18 +1135,13 @@ function bindEvents() {
   $("#language-select").addEventListener("change", (event) => applyLanguage(event.target.value));
   $("#share-site").addEventListener("click", shareSite);
   $("#reset-weights").addEventListener("click", () => resetWeights());
-  $("#view-stacked").addEventListener("click", () => setView("stacked"));
-  $("#view-table").addEventListener("click", () => setView("table"));
-  $("#filter-toggle").addEventListener("click", (event) => {
-    const open = event.currentTarget.getAttribute("aria-expanded") !== "true";
-    event.currentTarget.setAttribute("aria-expanded", String(open));
-    $("#filter-drawer").hidden = !open;
-  });
+  $("#shape-toggle").addEventListener("click", cycleRankingView);
   $("#reset-filters").addEventListener("click", () => resetDriverFilters());
   ["#team-filter", "#country-filter", "#era-filter", "#achievement-filter"].forEach((selector) => $(selector).addEventListener("change", applyDriverFiltersFromControls));
   $("#min-starts-filter").addEventListener("input", scheduleFilterUpdate);
   let lineupScrollFrame = 0;
   $('#lineup-scroll').addEventListener('scroll', () => {
+    if (state.shape === "circuit" && state.view !== "table") return;
     if (lineupScrollFrame) return;
     lineupScrollFrame = requestAnimationFrame(() => {
       lineupScrollFrame = 0;
@@ -1048,11 +1151,9 @@ function bindEvents() {
   }, {passive:true});
   bindViewport("compare");
   setupComparisonObserver();
-  $("#weight-list").addEventListener("click", (event) => {
-    const toggle = event.target.closest("[data-toggle-metric]");
-    if (toggle) toggleMetric(toggle.dataset.toggleMetric);
-    const reset = event.target.closest("[data-reset-metric]");
-    if (reset) resetMetric(reset.dataset.resetMetric);
+  document.addEventListener('click',event=>{
+    const reset=event.target.closest('[data-reset-metric]');if(reset)resetMetric(reset.dataset.resetMetric);
+    const toggle=event.target.closest('#metric-dock [data-toggle-metric]');if(toggle)toggleMetric(toggle.dataset.toggleMetric);
   });
   $("#lineup-table").addEventListener("click", (event) => {
     const toggle = event.target.closest("[data-toggle-metric]");
@@ -1076,19 +1177,19 @@ function bindEvents() {
   $("#lineup-table").addEventListener("error", (event) => {
     if (event.target.matches(".driver-portrait img")) event.target.closest(".driver-portrait").classList.add("no-photo");
   }, true);
-  $("#weight-list").addEventListener("input", (event) => {
+  document.addEventListener("input", (event) => {
     const slider = event.target.closest("[data-weight]");
     if (slider) updateWeight(slider.dataset.weight, slider.value);
     const number = event.target.closest("[data-weight-input]");
     if (number && number.value !== "") updateWeight(number.dataset.weightInput, number.value);
   });
-  $("#weight-list").addEventListener("change", (event) => {
+  document.addEventListener("change", (event) => {
     const number = event.target.closest("[data-weight-input]");
     if (!number) return;
     if (!updateWeight(number.dataset.weightInput, number.value)) number.value = formatWeight(state.weights[number.dataset.weightInput] || 0);
     number.value = formatWeight(state.weights[number.dataset.weightInput] || 0);
   });
-  $("#weight-list").addEventListener("focusout", (event) => {
+  document.addEventListener("focusout", (event) => {
     const number = event.target.closest("[data-weight-input]");
     if (number) number.value = formatWeight(state.weights[number.dataset.weightInput] || 0);
   });
@@ -1119,9 +1220,10 @@ function setOverview(open) {
   const next = open && state.scenarios.length > 1;
   const changed = state.overview !== next;
   const update = () => {
+    window.APEX_TRACK.settle();
     state.overview = next;
     $(".studio").classList.toggle("is-comparing", next);
-    $(".tool-rail").hidden = next;
+    $(".tool-rail").hidden = false;
     if (next) closeStudioTools();
     $("#single-view").hidden = next;
     $("#compare").hidden = !next;
@@ -1136,6 +1238,7 @@ function setOverview(open) {
   state.viewTransition?.skipTransition();
   if (document.startViewTransition) {
     state.viewTransition = document.startViewTransition(update);
+    state.viewTransition.ready.catch(() => {});
     state.viewTransition.finished.catch(() => {});
   } else {
     update();
@@ -1157,7 +1260,7 @@ function openScenario(id) {
   setView("stacked"); setOverview(false); renderAll();
 }
 function addScenarioFromWeights() {
-  const s = frozenScenario(`${t("customScenario", {number: state.scenarios.length + 1})}`, state.weights, state.scenarios.length, state.enabled);
+  const s = frozenScenario(`My F1 Ranking ${state.scenarios.length + 1}`, state.weights, state.scenarios.length, state.enabled);
   s.rankPositions = new Map(state.ranked.map((driver, i) => [driverKey(driver), i + 1]));
   const source = state.overview ? document.querySelector(`.comparison-column[data-scenario="${state.activeScenario}"] .comparison-rows`) : $('#lineup-scroll');
   s.seedMotion = window.APEX_MOTION.snapshot(source, state.overview ? '.compare-row' : '.lineup-row[data-driver]', state.overview ? 'data-flow-driver' : 'data-driver');
@@ -1179,7 +1282,7 @@ function fitCanvas() {
 let studioTool = null;
 function closeStudioTools({restoreFocus = false} = {}) {
   const previous = studioTool;
-  ["settings", "reverse", "code"].forEach(key => {
+  ["filters", "reverse", "code"].forEach(key => {
     $("#"+key+"-panel").hidden = true;
     $("#"+key+"-toggle").setAttribute("aria-expanded", "false");
   });
@@ -1189,11 +1292,12 @@ function closeStudioTools({restoreFocus = false} = {}) {
 function positionCodePanel() {
   const panel = $("#code-panel");
   if (innerWidth <= 720) { panel.style.right = ""; panel.style.top = ""; return; }
-  const anchor = $(".setup-cluster").getBoundingClientRect();
+  const anchor = $("#code-toggle").getBoundingClientRect();
   panel.style.right = `${Math.max(12, innerWidth - anchor.right)}px`;
-  panel.style.top = `${anchor.bottom + 10}px`;
+  panel.style.top = `${anchor.bottom + 8}px`;
 }
 function openStudioTool(key) {
+  window.APEX_TRACK.dismiss();
   closeStudioTools(); studioTool = key;
   $("#"+key+"-panel").hidden = false;
   $("#"+key+"-toggle").setAttribute("aria-expanded", "true");
@@ -1203,22 +1307,19 @@ function openStudioTool(key) {
   if (key === "code") { positionCodePanel(); renderCode(); $("#code-message").textContent = ""; $("#weight-import").focus(); }
 }
 function bindStudio() {
-  bindDriverDragging();
   window.addEventListener("resize", () => { if (studioTool === "code") positionCodePanel(); });
-  ["settings", "reverse", "code"].forEach(key => {
+  ["filters", "reverse", "code"].forEach(key => {
     $("#"+key+"-toggle").onclick = () => studioTool === key ? closeStudioTools({restoreFocus:true}) : openStudioTool(key);
     $("#"+key+"-close").onclick = () => closeStudioTools({restoreFocus:true});
   });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeStudioTools({restoreFocus:true}); $("#filter-drawer").hidden = true; $("#filter-toggle").setAttribute("aria-expanded", "false"); $("#period-popover").hidden = true; } });
+  document.addEventListener("keydown",e=>{if(e.key==='Escape')closeStudioTools({restoreFocus:true});});
   document.addEventListener("pointerdown", e => {
     if (studioTool === "code" && !e.target.closest("#code-panel,#code-toggle")) closeStudioTools();
   });
-  $("#period-toggle").onclick = () => { const el = $("#period-popover"); el.hidden = !el.hidden; $("#period-toggle").setAttribute("aria-expanded", String(!el.hidden)); };
-  $("#year-range-filter").addEventListener("submit", () => { $("#period-popover").hidden = true; });
   $("#overview-toggle").onclick = () => setOverview(!state.overview);
   $("#setup-name").addEventListener("change", e => {
     const s = state.scenarios.find(s => s.id === state.activeScenario);
-    if (s) { s.name = e.target.value.trim() || t("customScenario", {number:1}); s.presetKey = null; requestComparisonRender(); }
+    if (s) { s.name = e.target.value.trim() || "My F1 Ranking"; s.presetKey = null; requestComparisonRender(); }
   });
   const beginRename = title => {
     if (title.querySelector('input')) return;
@@ -1256,9 +1357,17 @@ function bindStudio() {
       else requestComparisonRender();
     }
   });
+  $('#comparison-rank-trace').addEventListener('click',event=>{
+    const target=event.target.closest('[data-locate-scenario]');if(!target)return;
+    const setup=state.scenarios.find(s=>s.id===target.dataset.locateScenario);if(!setup)return;
+    const ranking=filteredRanking(scenarioRanking(setup)),index=ranking.findIndex(d=>driverKey(d)===target.dataset.locateDriver);
+    if(index<0)return;
+    setup.raceOffset=window.APEX_TRACK.windowStart(index-3,ranking.length);
+    state.traceDriver=target.dataset.locateDriver;renderComparison();window.APEX_TRACK.focusDriver(state.traceDriver);
+  });
   $("#fit-canvas").onclick = fitCanvas;
   $("#comparison-chart").addEventListener("keydown", e => {
-    if (e.target.closest("button, input, [data-rename-scenario], .comparison-rows")) return;
+    if (e.target.closest("button, input, [data-rename-scenario], .comparison-rows, .race-venue")) return;
     const viewport = e.currentTarget;
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "+", "=", "-", "0"].includes(e.key)) e.preventDefault();
     if (e.key === "ArrowLeft") viewport.scrollLeft -= 90;
@@ -1269,27 +1378,44 @@ function bindStudio() {
     if (e.key === "-") setZoom("compare", state.zoom.compare / 1.2);
     if (e.key === "0") fitCanvas();
   });
-  window.addEventListener("apex-weights-applied", () => { openStudioTool("settings"); });
-  new ResizeObserver(() => { if (state.dataset) renderLineUp({animate:false}); if (state.overview) requestComparisonRender(); }).observe($("#lineup-scroll"));
+  window.addEventListener("apex-weights-applied", () => { closeStudioTools(); });
+  new ResizeObserver(() => { if(state.shapeMorphing)return; if (state.dataset) renderLineUp({animate:false}); if (state.overview) requestComparisonRender(); }).observe($("#lineup-scroll"));
+  new ResizeObserver(()=>{if(state.shapeMorphing)return;if(state.overview&&state.dataset)requestComparisonRender();}).observe($('#comparison-chart'));
   const tooltip = $("#metric-tooltip");
   function showTip(target) {
-    const rect = target.getBoundingClientRect(); tooltip.textContent = target.dataset.tooltip; tooltip.hidden = false;
-    tooltip.style.left = `${Math.max(12, Math.min(rect.left - 290, innerWidth - 310))}px`;
-    tooltip.style.top = `${Math.max(12, Math.min(rect.top, innerHeight - 100))}px`;
+    const compact=target.hasAttribute('data-metric-hint');
+    tooltip.classList.toggle('is-metric-hint',compact);
+    tooltip.textContent=compact?target.dataset.metricHint:target.dataset.tooltip;tooltip.hidden=false;
+    const rect=target.getBoundingClientRect(),box=tooltip.getBoundingClientRect();
+    const left=rect.left<innerWidth/2?rect.right+10:rect.left-box.width-10;
+    tooltip.style.left=`${Math.max(8,Math.min(left,innerWidth-box.width-8))}px`;
+    tooltip.style.top=`${Math.max(8,Math.min(rect.top+(rect.height-box.height)/2,innerHeight-box.height-8))}px`;
   }
-  document.addEventListener("mouseover", e => { const target = e.target.closest("[data-tooltip]"); if (target) showTip(target); else tooltip.hidden = true; });
-  document.addEventListener("focusin", e => { const target = e.target.closest("[data-tooltip]"); if (target) showTip(target); else tooltip.hidden = true; });
+  document.addEventListener('mouseover',e=>{const target=e.target.closest('[data-tooltip],[data-metric-hint]');if(target)showTip(target);else tooltip.hidden=true;});
+  document.addEventListener('mouseout',e=>{if(e.target.closest('[data-tooltip],[data-metric-hint]')&&!e.relatedTarget?.closest?.('[data-tooltip],[data-metric-hint]'))tooltip.hidden=true;});
+  document.addEventListener('focusin',e=>{const target=e.target.closest('[data-tooltip]')||e.target.closest('.grandstand-metric')?.querySelector('[data-metric-hint]');if(target)showTip(target);else tooltip.hidden=true;});
   document.addEventListener("focusout", () => { tooltip.hidden = true; });
   document.addEventListener("keydown", e => { if (e.key === "Escape") tooltip.hidden = true; });
   let highlightedMetric;
   const highlightMetric = e => {
-    const key = e.target.closest("[data-segment-metric]")?.dataset.segmentMetric || e.target.closest("[data-control-metric]")?.dataset.controlMetric || e.target.closest(".metric-mini")?.dataset.toggleMetric;
-    if (key === highlightedMetric) return;
-    highlightedMetric = key;
-    document.querySelectorAll(".stack-segment").forEach(s => s.classList.toggle("metric-dimmed", Boolean(key) && s.dataset.segmentMetric !== key));
+    const origin=e.target.closest('[data-segment-metric],[data-control-metric],[data-toggle-metric],[data-metric]');
+    const key=origin&&(origin.dataset.segmentMetric||origin.dataset.controlMetric||origin.dataset.toggleMetric||origin.dataset.metric);
+    if(key===highlightedMetric)return;highlightedMetric=key;
+    document.querySelectorAll('.stack-segment,.circuit-segment').forEach(el=>el.classList.toggle('metric-dimmed',Boolean(key)&&el.dataset.segmentMetric!==key));
+    document.querySelectorAll('[data-metric]').forEach(el=>el.classList.toggle('is-linked-metric',Boolean(key)&&el.dataset.metric===key));
+    document.querySelectorAll('.grandstand-card').forEach(el=>{
+      const active=Boolean(key)&&el.dataset.controlMetric===key;el.classList.toggle('is-linked-metric',active);
+      if(!active||!el.getClientRects().length||origin?.closest('.grandstand-card'))return;
+      const scroll=el.closest('#metric-dock,.circuit-grandstand');if(!scroll)return;
+      const box=el.getBoundingClientRect(),bounds=scroll.getBoundingClientRect(),smooth=!matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if(scroll.id==='metric-dock'&&(box.left<bounds.left||box.right>bounds.right))scroll.scrollTo({left:scroll.scrollLeft+box.left-bounds.left-(bounds.width-box.width)/2,behavior:smooth?'smooth':'instant'});
+      else if(scroll.id!=='metric-dock'&&(box.top<bounds.top||box.bottom>bounds.bottom))scroll.scrollTo({top:scroll.scrollTop+box.top-bounds.top-(bounds.height-box.height)/2,behavior:smooth?'smooth':'instant'});
+    });
   };
-  document.addEventListener("mouseover", highlightMetric);
-  document.addEventListener("focusin", highlightMetric);
+  document.addEventListener('mouseover',highlightMetric);
+  document.addEventListener('focusin',e=>{if(!e.target.matches('#lineup-scroll,#comparison-chart'))highlightMetric(e);});
+  document.addEventListener('mouseout',e=>{if(!e.relatedTarget)highlightMetric({target:document.body});});
+
 }
 
 async function initialise() {

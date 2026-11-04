@@ -1,0 +1,552 @@
+/* Circuit view: asphalt, shared finish gantry, eight concentric racing lanes. */
+#shape-toggle { width:32px; min-width:32px; height:30px; padding:5px; color:#c5ceda; }
+#shape-toggle[aria-pressed="true"] { color:#fff; border-color:#f00827; background:#42151f; }
+#shape-toggle svg { width:21px; height:19px; }
+.lineup-scroll.is-circuit { overflow:hidden; }
+.lineup-table.circuit-mode { display:flex; flex-direction:column; height:100%; }
+.circuit-mode .stacked-header { flex:none; }
+.circuit-mode .stacked-title { display:none; }
+.race-main-host { flex:1; min-height:0; }
+.single-view:has(.circuit-mode)>.pagination { display:none; }
+.race-venue { position:relative; height:100%; min-height:0; overflow:hidden; isolation:isolate; outline-offset:-3px; background:radial-gradient(ellipse at center,#182027 0%,#0d1116 66%); touch-action:pan-x; }
+.race-venue::before { content:''; position:absolute; inset:0; opacity:.11; background:repeating-linear-gradient(120deg,transparent 0 3px,#4f5c6b 3px 4px); pointer-events:none; }
+.circuit-svg { position:absolute; inset:0; width:100%; height:calc(100% - 30px); overflow:visible; }
+.circuit-lane { fill:none; stroke:#27323c; stroke-width:11; stroke-linecap:butt; }
+.circuit-segment { fill:none; stroke-width:9; stroke-linecap:butt; stroke-linejoin:round; transition:opacity .18s; }
+.circuit-segment.metric-dimmed { opacity:.13; }
+.circuit-kerb { fill:none; stroke:#b02b40; stroke-width:5; stroke-dasharray:12 7; }
+.circuit-inner-edge { fill:none; stroke:#60717f; stroke-width:1; stroke-dasharray:3 5; }
+.circuit-scale { fill:#8995a4; font-size:10px; font-variant-numeric:tabular-nums; font-family:inherit; }
+.circuit-car { color:var(--team); cursor:pointer; filter:drop-shadow(0 2px 2px #000); outline:none; }
+.circuit-car:hover,.circuit-car:focus-visible { filter:drop-shadow(0 0 5px #fff); }
+.circuit-badge { pointer-events:none; }
+.circuit-badge rect { fill:#10161f; stroke:var(--team); stroke-width:1; }
+.circuit-badge text { fill:#e9edf3; font-size:10px; font-weight:650; font-family:inherit; }
+.circuit-leader { fill:none; stroke:var(--team); stroke-width:.8; opacity:.65; pointer-events:none; }
+.circuit-infield { position:absolute; left:25%; right:25%; top:50%; transform:translateY(calc(-50% - 15px)); pointer-events:none; }
+.circuit-score-key { display:flex; justify-content:space-between; gap:6px; margin:0 0 9px; padding:0 4px 7px; border-bottom:1px solid #3a4653; font-size:11px; color:#c0cbd8; pointer-events:auto; }
+.circuit-score-key span { color:#75899a; font-variant-numeric:tabular-nums; }
+.circuit-roster { display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; }
+.circuit-roster-row { display:flex; min-width:0; align-items:center; border-left:2px solid var(--team); background:#121a23d9; pointer-events:auto; }
+.circuit-roster-row .driver-drag { flex:0 0 18px; width:18px; min-width:18px; height:30px; }
+.circuit-identity { display:grid; grid-template-columns:20px minmax(0,1fr) 30px 22px; align-items:center; gap:4px; min-width:0; width:100%; height:30px; padding:0 4px 0 0; font-size:11px; border:0; border-radius:0; background:transparent; text-align:left; color:#dae2ec; }
+.circuit-identity:hover,.circuit-identity:focus-visible { background:#263442; }
+.circuit-name { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.circuit-name .nationality-flag { width:13px; height:10px; margin-right:5px; vertical-align:-1px; }
+.circuit-rank { color:#91a0b0; font-variant-numeric:tabular-nums; }
+.circuit-identity strong { font-size:11px; text-align:right; font-variant-numeric:tabular-nums; }
+.circuit-delta { font-size:9px; text-align:right; color:#7a8b9b; }
+.circuit-delta.rank-up { color:#71dcaa; }.circuit-delta.rank-down { color:#fa7986; }
+.circuit-window { position:absolute; bottom:3px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:12px; color:#d5dce7; height:27px; }
+.circuit-window button { width:28px; min-height:26px; padding:0; font-size:19px; border:1px solid #465260; background:#17212a; }
+.circuit-window button:disabled { opacity:.25; cursor:default; }
+.circuit-window output { min-width:100px; white-space:nowrap; font-size:11px; font-variant-numeric:tabular-nums; text-align:center; }
+.circuit-window output span { color:#7c8c9e; }
+.circuit-empty { text-align:center; color:#aebdcd; font-size:12px; padding:10px; }
+.circuit-driver,.circuit-roster-row { transition:opacity .18s; }
+.has-driver-focus .circuit-driver:not(.is-driver-focus) { opacity:.23!important; }
+.has-driver-focus .circuit-roster-row:not(.is-driver-focus) { opacity:.45; }
+.circuit-profile { position:fixed; z-index:100; width:min(430px,calc(100vw - 16px)); max-height:min(440px,calc(100dvh - 16px)); overflow:auto; padding:14px; background:#141c26f5; border:1px solid #627284; border-top:2px solid #f00827; border-radius:6px; box-shadow:0 18px 55px #000c; backdrop-filter:blur(14px); animation:circuit-profile-in .18s ease-out; }
+.circuit-profile .driver-detail-inner { padding:0; display:grid; grid-template-columns:1fr; gap:12px; }
+.circuit-profile .detail-identity { grid-column:1; grid-row:1; }
+.circuit-profile .detail-stats { grid-column:1; grid-row:2; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.circuit-profile .detail-copy { grid-column:1; grid-row:3; font-size:11px; }
+.circuit-profile .detail-copy p { max-height:100px; overflow:auto; }
+.circuit-profile .detail-identity h4 { font-size:18px; }
+.comparison-board.circuit-board { display:flex; gap:24px; }
+.circuit-board .comparison-column { position:relative; left:auto!important; flex:none; width:390px; }
+.comparison-chart .circuit-svg { width:100%; height:calc(100% - 30px); min-width:0; overflow:visible; }
+.race-comparison-host { height:calc(100% - 48px); }
+.is-vertical .circuit-infield { left:31%; right:31%; }
+.is-vertical .circuit-roster { grid-template-columns:1fr; gap:3px; }
+.is-vertical .circuit-score-key { font-size:9px; margin-bottom:6px; padding-bottom:5px; }
+.is-vertical .circuit-identity { grid-template-columns:14px minmax(0,1fr) 27px 18px; font-size:9px; gap:2px; height:26px; padding-left:4px; }
+.is-vertical .circuit-identity strong { font-size:10px; }
+.is-vertical .circuit-roster-row .driver-drag { display:none; }
+.is-vertical .circuit-delta { display:block; font-size:8px; }
+.is-vertical .circuit-name .nationality-flag { display:none; }
+.is-vertical .circuit-name { font-size:9px; }
+.circuit-morph { position:fixed; inset:0; width:100vw; height:100vh; z-index:50; pointer-events:none; }
+.circuit-morph-target .circuit-racers,.circuit-morph-target .stack-track { opacity:0; }
+@keyframes circuit-profile-in { from { opacity:0; transform:translateY(6px) scale(.97); } to { opacity:1; transform:none; } }
+@media(max-width:800px) {
+  .circuit-infield { left:22%; right:22%; }
+  .circuit-roster { gap:2px 6px; }
+  .circuit-identity { grid-template-columns:16px minmax(0,1fr) 28px; font-size:9px; }
+  .circuit-delta { display:none; }
+  .circuit-roster-row .driver-drag { display:none; }
+}
+@media(max-width:540px) {
+  .race-main-host .race-venue { display:flex; flex-direction:column; justify-content:center; }
+  .race-main-host .circuit-svg { position:relative; inset:auto; flex:none; width:100%; height:auto; aspect-ratio:1024/500; }
+  .race-main-host .circuit-infield { position:relative; inset:auto; width:calc(100% - 24px); margin:18px 12px 50px; transform:none; }
+  .circuit-identity { height:29px; }
+  .circuit-score-key { margin-bottom:5px; }
+  .circuit-board .comparison-column { width:330px; }
+  .is-vertical .circuit-infield { left:30%; right:30%; top:50%; bottom:auto; transform:translateY(calc(-50% - 15px)); }
+}
+@media(prefers-reduced-motion:reduce) { .circuit-profile,.circuit-driver,.circuit-roster-row { animation:none; transition:none; } }
+
+/* The circuit, its identity key and its scale share SVG coordinates. */
+.studio,.studio.is-comparing { padding:12px 84px 12px 12px; }
+.tool-rail { top:12px; right:18px; }
+.tool-rail #filters-toggle.has-filters { box-shadow:inset 2px 0 #f00827; color:#fff; }
+.studio.is-comparing~.tool-rail #settings-toggle,.studio.is-comparing~.tool-rail #reverse-toggle { display:none; }
+.settings-panel { top:12px; }
+.reverse-workbench { top:12px; height:auto; max-height:calc(100dvh - 32px); }
+.filters-workbench { position:fixed; z-index:34; top:12px; right:84px; width:360px; max-height:calc(100dvh - 24px); display:flex; flex-direction:column; background:#131a22f5; border:1px solid #526071; border-top:2px solid #f00827; border-radius:6px; box-shadow:0 18px 60px #000b; backdrop-filter:blur(12px); }
+.filters-body { padding:14px; overflow:auto; min-height:0; }
+.filters-body .canvas-controls { display:flex; flex-direction:column; align-items:stretch; height:auto; min-height:0; padding:0; margin:0; border:0; gap:14px; }
+.filters-body .period-controls { display:grid; grid-template-columns:30px 1fr auto; gap:8px; width:100%; flex:auto; }
+.filters-body .studio-mark { width:28px; height:28px; }
+.filters-body #period-toggle { justify-self:start; }
+.filters-body .search-box { grid-column:1/-1; grid-row:2; width:100%; max-width:none; }
+.filters-body .canvas-actions { display:flex; flex-wrap:wrap; gap:10px; width:100%; justify-content:flex-start; }
+.filters-body .setup-cluster { width:100%; flex:1 0 100%; }
+.filters-body #setup-name { flex:1; min-width:0; width:80px; }
+.filters-body #language-select { margin-left:auto; width:135px; }
+.filters-body #shape-toggle { width:34px; height:32px; }
+.filters-body #period-popover,.filters-body #filter-drawer { position:static; width:100%; padding:12px 0 0; margin:14px 0 0; border:0; border-top:1px solid #3d4855; box-shadow:none; background:transparent; }
+.filters-body .filter-grid { grid-template-columns:1fr 1fr; }
+.filters-body .filter-grid select { width:100%; }
+.filters-body .filter-footer { align-items:flex-start; flex-direction:column; gap:8px; }
+.filters-body .year-range-filter { gap:9px; }
+.filters-body .year-range-filter select { width:85px; }
+.race-venue { display:grid; grid-template-columns:clamp(96px,11%,150px) minmax(0,1fr) clamp(96px,11%,150px); grid-template-rows:minmax(0,1fr) 42px; gap:0 8px; padding:10px 8px 0; }
+.circuit-stage { position:relative; grid-column:2; grid-row:1; min-width:0; min-height:0; overflow:hidden; border-radius:4px; }
+.circuit-camera { position:absolute; inset:0; transform-origin:center; transition:transform 220ms cubic-bezier(.22,.7,.2,1); }
+.is-camera-panning .circuit-camera { transition:none; }
+.is-race-zoomed .circuit-stage { cursor:grab; }
+.is-camera-panning .circuit-stage { cursor:grabbing; }
+.race-venue .circuit-svg,.comparison-chart .circuit-svg,.race-main-host .circuit-svg { position:absolute; inset:0; width:100%; height:100%; min-width:0; aspect-ratio:auto; overflow:visible; }
+.race-venue .circuit-infield { position:static; inset:auto; width:100%; height:100%; margin:0; transform:none; overflow:hidden; padding:1px 3px; }
+.circuit-infield-anchor { overflow:hidden; }
+.circuit-score-key { font-size:11px; height:23px; margin:0 0 5px; padding:1px 2px 4px; }
+.circuit-roster { grid-template-columns:1fr 1fr; gap:3px 10px; }
+.circuit-identity { height:28px; min-height:28px; grid-template-columns:19px minmax(0,1fr) 30px 21px; font-size:11px; gap:3px; }
+.circuit-roster-row .driver-drag { display:grid; height:28px; flex-basis:16px; min-width:16px; width:16px; }
+.circuit-delta { display:block; }
+.is-vertical .circuit-score-key { height:23px; font-size:10px; margin-bottom:5px; }
+.is-vertical .circuit-roster { grid-template-columns:1fr; gap:3px; }
+.is-vertical .circuit-identity { min-height:25px; height:25px; grid-template-columns:14px minmax(0,1fr) 27px 18px; font-size:10px; }
+.is-vertical .circuit-roster-row .driver-drag { display:none; }
+.circuit-identity { grid-template-columns:18px minmax(0,1fr) 22px; grid-template-rows:14px 12px; height:28px; line-height:1; }
+.circuit-identity .circuit-rank { grid-column:1; grid-row:1/3; }
+.circuit-identity .circuit-name { grid-column:2/4; grid-row:1; }
+.circuit-identity strong { grid-column:2; grid-row:2; text-align:left; font-size:10px; color:#aebdcd; }
+.circuit-identity .circuit-delta { grid-column:3; grid-row:2; }
+.is-vertical .circuit-identity { grid-template-columns:14px minmax(0,1fr) 18px; grid-template-rows:12px 11px; }
+.is-vertical .circuit-identity strong { font-size:9px; }
+.circuit-scale { font-size:11px; font-weight:600; fill:#bac8d6; paint-order:stroke; stroke:#0d1116; stroke-width:3px; stroke-linejoin:round; }
+.circuit-tick { fill:none; stroke:#8195a6; stroke-width:1; }
+.circuit-grandstand { min-width:0; min-height:0; display:flex; flex-direction:column; justify-content:center; gap:7px; overflow-y:auto; padding:8px 3px; scrollbar-width:thin; overscroll-behavior:contain; }
+.grandstand-left { grid-column:1; grid-row:1; border-right:1px solid #303c48; }
+.grandstand-right { grid-column:3; grid-row:1; border-left:1px solid #303c48; }
+.grandstand-metric { display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:minmax(25px,auto) 20px; gap:3px 5px; width:100%; min-height:58px; flex:none; padding:6px 7px 5px; text-align:left; border:1px solid #40505f; border-bottom:3px solid var(--segment); border-radius:3px 3px 6px 6px; background:linear-gradient(160deg,#1a2630,#0f1820); color:#d3dce8; cursor:pointer; }
+.grandstand-metric:hover,.grandstand-metric:focus-visible { background:#2a3540; border-color:var(--segment); }
+.grandstand-name { font-size:11px; line-height:1.2; overflow-wrap:normal; }
+.grandstand-metric strong { align-self:start; font-size:10px; color:#fff; }
+.grandstand-seats { display:grid; grid-template-columns:repeat(8,1fr); align-items:end; gap:2px; grid-column:1/-1; height:20px; padding:0 2px; transform:perspective(80px) rotateX(12deg); }
+.grandstand-seats i { background:repeating-linear-gradient(to top,var(--segment) 0 3px,transparent 3px 5px); min-height:0; border-radius:1px; opacity:.85; }
+.grandstand-metric.is-disabled { border-bottom-color:#65717d; }
+.grandstand-metric.is-disabled .grandstand-name { text-decoration:line-through; color:#a9b3c0; }
+.grandstand-metric.is-disabled .grandstand-seats { opacity:.2; }
+.race-venue .circuit-window { position:static; grid-column:1/-1; grid-row:2; transform:none; height:42px; display:flex; justify-content:center; gap:24px; border-top:1px solid #2b3845; }
+.race-page-controls,.race-zoom-controls { display:flex; align-items:center; gap:7px; }
+.circuit-window .race-zoom-value { min-width:42px; font-size:10px; }
+.circuit-window [data-race-zoom="fit"] svg { display:block; width:17px; height:17px; min-width:0; margin:auto; overflow:visible; }
+.is-vertical .circuit-name { font-size:11px; }
+.is-vertical .circuit-identity strong { font-size:10px; }
+.comparison-board.circuit-board { gap:16px; }
+.circuit-board .comparison-column { width:560px; }
+.is-vertical.race-venue { grid-template-columns:76px minmax(0,1fr) 76px; gap:0 4px; padding:4px 4px 0; }
+.is-vertical .circuit-grandstand { gap:5px; padding:4px 1px; }
+.is-vertical .grandstand-metric { grid-template-columns:1fr; grid-template-rows:auto 15px; min-height:55px; padding:4px; position:relative; }
+.is-vertical .grandstand-name { font-size:9px; padding-right:19px; min-height:24px; }
+.is-vertical .grandstand-metric strong { position:absolute; right:3px; top:4px; font-size:8px; }
+.is-vertical .grandstand-seats { height:15px; gap:1px; }
+.is-vertical .circuit-window { gap:10px; }
+.is-vertical .circuit-window button { width:25px; }
+.is-vertical .circuit-window output { min-width:77px; font-size:10px; }
+.is-vertical .circuit-window .race-zoom-value { min-width:35px; }
+@media(max-width:720px) {
+  .studio,.studio.is-comparing { padding:6px 6px 58px; }
+  .tool-rail { top:auto; right:10px; bottom:8px; }
+  .filters-workbench { top:8px; left:6px; right:6px; bottom:62px; width:auto; max-height:none; }
+  .settings-panel,.reverse-workbench { top:8px; }
+  .race-venue { grid-template-columns:72px minmax(0,1fr) 72px; gap:0 3px; padding:4px 3px 0; }
+  .grandstand-metric { padding:4px; min-height:55px; }
+  .grandstand-name { font-size:9px; }
+  .grandstand-metric strong { font-size:8px; }
+  .race-venue .circuit-window { gap:8px; }
+  .circuit-window output { min-width:82px; }
+}
+@media(max-width:540px) {
+  .race-main-host .race-venue { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:minmax(200px,1fr) minmax(150px,.8fr) 42px; justify-content:normal; }
+  .race-main-host .circuit-stage { grid-row:1; grid-column:1/-1; }
+  .race-main-host .circuit-grandstand { grid-row:2; padding:4px; justify-content:flex-start; }
+  .race-main-host .grandstand-left { grid-column:1; }.race-main-host .grandstand-right { grid-column:2; }
+  .race-main-host .circuit-window { grid-row:3; }
+  .race-main-host .grandstand-metric { min-height:51px; grid-template-rows:20px 16px; }
+  .race-main-host .grandstand-seats { height:16px; }
+  .race-main-host .circuit-infield { position:static; margin:0; width:100%; transform:none; }
+}
+@media(prefers-reduced-motion:reduce) { .circuit-camera { transition:none; } }
+
+/* View and setup actions belong to the workspace, not the filtering drawer. */
+.workspace-toolbar { display:flex; align-items:center; gap:10px; flex:none; min-height:38px; margin-bottom:8px; }
+.workspace-toolbar .studio-mark { width:27px; height:27px; }
+.workspace-toolbar .canvas-actions { display:flex; align-items:center; flex-wrap:nowrap; gap:9px; margin-left:auto; }
+.workspace-toolbar .setup-cluster #setup-name { width:112px; }
+.workspace-toolbar #language-select { height:30px; min-height:30px; width:110px; font-size:11px; }
+.filters-body .period-controls { grid-template-columns:1fr auto; }
+.filters-body #period-toggle { grid-column:1; grid-row:1; }
+.filters-body #filter-toggle { grid-column:2; grid-row:1; }
+.canvas-view.has-rank-trace { display:flex; flex-direction:column; overflow:clip; }
+.race-venue,.circuit-stage { overflow:clip; }
+.has-rank-trace #comparison-chart { flex:1; height:auto; min-height:0; }
+.comparison-rank-trace { display:flex; align-items:center; gap:16px; min-height:57px; flex:none; padding:6px 14px; border-bottom:1px solid #384654; background:#121923; }
+.rank-trace-driver { display:flex; align-items:center; gap:7px; width:180px; min-width:0; flex:none; }
+.rank-trace-driver strong { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rank-journey { display:flex; align-items:center; gap:10px; overflow:auto; min-width:0; scrollbar-width:thin; }
+.rank-journey-node { display:grid; grid-template-columns:auto auto; grid-template-rows:15px 22px; column-gap:12px; min-width:115px; max-width:180px; flex:none; padding:3px 9px; border:1px solid #3c4c5b; border-radius:4px; background:#17222d; text-align:left; }
+.rank-journey-node>span { grid-column:1/-1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; color:#a4b6c8; }
+.rank-journey-node strong { font-size:16px; font-weight:650; font-variant-numeric:tabular-nums; line-height:22px; color:#f3f6fa; }
+.rank-journey-node small { font-size:10px; justify-self:end; align-self:center; color:#a4b6c8; }
+.rank-journey-node:hover,.rank-journey-node:focus-visible { border-color:#f00827; background:#2a2430; }
+.rank-journey-arrow { color:#8b9fb2; font-size:19px; }
+.rank-journey-node small.rank-up,.circuit-comparison-delta.rank-up { color:#71dcaa; }
+.rank-journey-node small.rank-down,.circuit-comparison-delta.rank-down { color:#fa7986; }
+.comparison-column-head .comparison-reference { flex:none; font-size:8px; color:#c1cfdf; border:1px solid #647185; padding:3px 4px; border-radius:3px; letter-spacing:0; }
+.circuit-comparison-delta { display:inline-block; margin-left:7px; font-style:normal; font-size:9px; font-weight:600; color:#8194a7; }
+@media(max-width:850px) {
+  .workspace-toolbar { flex-wrap:wrap; gap:7px; }
+  .workspace-toolbar .canvas-actions { width:100%; margin-left:0; justify-content:space-between; }
+  .workspace-toolbar .setup-cluster { flex:1; min-width:0; }
+  .workspace-toolbar .setup-cluster #setup-name { flex:1; width:65px; min-width:30px; }
+  .rank-trace-driver { width:130px; }
+  .comparison-rank-trace { gap:10px; padding:5px 8px; }
+}
+@media(max-width:480px) {
+  .workspace-toolbar .canvas-actions { gap:5px; }
+  .workspace-toolbar #language-select { width:78px; font-size:10px; }
+  .workspace-toolbar #shape-toggle { width:28px; min-width:28px; }
+  .rank-trace-driver { width:105px; }
+  .rank-trace-driver strong { font-size:10px; }
+}
+/* Pit-lane workspace: integrated metric controls and floating utility icons. */
+.studio,.studio.is-comparing { padding:12px; }
+.workspace-toolbar { padding-right:88px; gap:8px; }
+.workspace-toolbar .canvas-actions { gap:7px; }
+.workspace-toolbar .setup-cluster #setup-name { width:145px; }
+.tool-rail { top:12px; right:12px; bottom:auto; flex-direction:row; gap:6px; padding:0; border:0; background:transparent; box-shadow:none; }
+.tool-rail button { position:relative; width:34px; min-width:34px; height:34px; padding:7px; border:1px solid #475360; background:#151d26ed; box-shadow:0 3px 10px #0008; }
+.tool-rail button+button { border:1px solid #475360; }
+.tool-rail .studio-icon { width:18px; height:18px; }
+.tool-rail button b { position:absolute; top:-4px; right:-4px; background:#e61b37; border-radius:8px; min-width:14px; font-size:9px; padding:2px; }
+.studio.is-comparing~.tool-rail #reverse-toggle { display:none; }
+.setup-cluster .add-setup-button { display:flex; align-items:center; gap:5px; padding:4px 9px; min-height:30px; border:1px solid #d93a50; background:#5a1724; color:#fff; white-space:nowrap; font-size:11px; }
+.add-setup-button .studio-icon { width:17px; height:17px; }
+.add-setup-button:hover { background:#a12138; border-color:#ff7385; }
+.workspace-toolbar #reset-weights { width:29px; min-width:29px; height:30px; padding:5px; background:#151c24; }
+.filters-workbench { top:60px; bottom:auto; right:12px; left:auto; width:330px; max-height:calc(100dvh - 76px); overflow:auto; }
+.filters-body { padding:10px; }
+.filters-body .canvas-controls,.filters-body .period-controls { display:block; margin:0; padding:0; }
+.filters-body .search-box { width:100%; max-width:none; height:32px; min-height:32px; }
+.filters-body .period-popover { display:block; position:static; width:auto; border:0; box-shadow:none; background:transparent; padding:10px 0; }
+.filters-body .year-range-filter { display:grid; grid-template-columns:1fr 1fr auto; gap:6px; padding:0; align-items:end; }
+.filters-body .range-title { grid-column:1/-1; font-size:10px; margin:0; }
+.filters-body .range-dash { display:none; }
+.filters-body .year-range-filter label { display:flex; flex-direction:column; gap:3px; font-size:10px; }
+.filters-body .year-range-filter select { width:100%; min-width:0; height:28px; padding:3px 6px; font-size:11px; }
+.filters-body .year-range-filter button { min-height:28px; padding:3px 8px; font-size:10px; }
+.filters-body #reset-year-range { grid-column:1/-1; justify-self:end; padding:0; min-height:18px; color:#9cabbc; background:none; }
+.filters-body .filter-drawer { display:block; position:static; padding:10px 0 0; border:0; border-top:1px solid #34404d; background:none; }
+.filters-body .filter-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.filters-body .filter-grid label { gap:4px; font-size:10px; }
+.filters-body .filter-grid :is(select,input) { height:29px; min-height:29px; font-size:11px; padding:4px 6px; width:100%; min-width:0; }
+.filters-body .filter-footer { display:flex; flex-direction:row; align-items:center; justify-content:space-between; margin-top:10px; padding:0; font-size:10px; }
+.filters-body .filter-footer button { padding:3px 5px; font-size:10px; }
+.workbench-head { min-height:36px; padding:5px 10px; }
+.reverse-workbench { top:60px; right:12px; bottom:auto; left:auto; width:610px; height:440px; max-width:calc(100vw - 24px); max-height:calc(100dvh - 76px); border-radius:5px; }
+#reverse-pane .inverse-grid { grid-template-columns:minmax(230px,1fr) minmax(0,1fr); grid-template-rows:1fr; }
+#reverse-pane .panel { padding:10px; }
+#reverse-pane .panel-head { padding-bottom:7px; }
+#reverse-pane .inverse-picker { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:5px; margin:0 0 5px; }
+#reverse-pane .inverse-picker>label { display:none; }
+#reverse-pane .inverse-picker input,#reverse-pane .inverse-picker select { height:29px; min-height:29px; font-size:11px; padding:4px 6px; }
+#reverse-pane .inverse-picker button { min-height:29px; padding:3px 8px; font-size:11px; }
+#reverse-pane .inverse-list { gap:3px; padding:4px 0; }
+#reverse-pane .inverse-list li { min-height:34px; padding:4px; gap:4px; }
+#reverse-pane .inverse-name { font-size:11px; }
+#reverse-pane .inverse-name small { margin-top:2px; gap:4px; font-size:9px; }
+#reverse-pane .inverse-actions { gap:1px; }
+#reverse-pane .inverse-actions button { min-width:20px; width:20px; min-height:23px; padding:2px; }
+#reverse-pane .inverse-grip { font-size:10px; width:10px; }
+#reverse-pane .inverse-weight-list { gap:4px; }
+#reverse-pane .inverse-weight-row { min-height:45px; height:45px; padding:3px 5px; grid-template-columns:25px minmax(0,1fr); gap:6px; }
+#reverse-pane .inverse-vertical-control input { height:25px; }
+#reverse-pane .inverse-weight-heading { font-size:10px; }
+#reverse-pane :is(#inverse-solve,#inverse-apply) { min-height:29px; padding:5px 8px; font-size:11px; }
+.race-venue { grid-template-columns:170px minmax(0,1fr) 170px; background:#101c19; }
+.race-venue::before { opacity:.72; background:linear-gradient(#08101633,#08101655),url('./assets/studio/circuit-grounds.svg') center/cover; }
+.circuit-stage { z-index:1; }
+.circuit-grandstand { z-index:2; justify-content:flex-start; padding:5px 3px; gap:5px; border:0; }
+.grandstand-card.weight-control { display:flex; flex-direction:column; gap:0; min-height:69px; height:69px; padding:0; border:1px solid #42505b; border-bottom:2px solid var(--segment); border-radius:3px 3px 6px 6px; background:#111b23ed; flex:none; overflow:visible; }
+.grandstand-card .grandstand-metric { display:grid; position:relative; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:24px 10px; gap:0 4px; min-height:37px; height:37px; border:0; background:transparent; padding:3px 6px 0; border-radius:2px; }
+.grandstand-card .grandstand-name { font-size:10px; line-height:12px; padding:0; min-height:0; align-self:center; }
+.grandstand-card .grandstand-metric strong { position:static; font-size:10px; align-self:center; }
+.grandstand-card .grandstand-seats { height:9px; padding:0; opacity:.55; }
+.grandstand-card .grandstand-seats i { background:var(--segment); }
+.grandstand-adjust { display:grid; grid-template-columns:minmax(30px,1fr) 43px 21px; gap:4px; align-items:center; padding:3px 5px; }
+.grandstand-adjust input[type=range] { width:100%; min-width:0; height:18px; margin:0; accent-color:var(--segment); cursor:pointer; }
+.grandstand-adjust input[type=number] { width:43px; min-width:0; height:23px; font-size:11px; text-align:right; padding:2px 3px; border:1px solid #52606b; border-radius:2px; background:#0a1118; color:#e4edf6; appearance:textfield; }
+.grandstand-adjust input::-webkit-inner-spin-button { appearance:none; }
+.grandstand-adjust .weight-reset { width:21px; min-width:21px; height:23px; min-height:23px; padding:3px; background:none; border:0; color:#92a4b6; }
+.grandstand-adjust .studio-icon { width:14px; height:14px; }
+.grandstand-card.is-disabled { border-bottom-color:#536171; }
+.grandstand-card.is-disabled .grandstand-name { text-decoration:line-through; color:#91a1ae; }
+.grandstand-card.is-disabled .grandstand-seats { opacity:.15; }
+.grandstand-card:focus-within,.grandstand-card:hover { border-color:var(--segment); }
+.metric-dock { display:flex; flex:none; gap:5px; overflow-x:auto; overscroll-behavior:contain; padding:3px 2px 7px; }
+.metric-dock .grandstand-card { width:170px; }
+.race-venue.is-vertical { grid-template-columns:minmax(0,1fr); padding:8px 8px 0; }
+.race-venue.is-vertical .circuit-stage { grid-column:1; }
+.race-venue.is-vertical .circuit-grandstand { display:none; }
+.circuit-roster-row .driver-drag { display:none; }
+.circuit-roster-row { backdrop-filter:blur(4px); }
+.profile-close { position:absolute; top:6px; right:6px; width:26px; height:26px; padding:0; background:#263440; border:1px solid #5c6b79; color:white; font-size:19px; }
+.circuit-profile .detail-identity { padding-right:20px; }
+@media(max-width:1000px) {
+ .workspace-toolbar { flex-wrap:wrap; }
+ .workspace-toolbar .canvas-actions { width:100%; margin-left:0; }
+ .race-venue { grid-template-columns:150px minmax(0,1fr) 150px; }
+}
+@media(max-width:720px) {
+ .studio,.studio.is-comparing { padding:6px; }
+ .workspace-toolbar { padding-right:0; }
+ .workspace-toolbar .view-switch { margin-right:80px; }
+ .tool-rail { top:6px; right:6px; bottom:auto; }
+ .filters-workbench,.reverse-workbench { top:88px; right:6px; left:auto; bottom:auto; max-width:calc(100vw - 12px); max-height:calc(100dvh - 100px); }
+ .workspace-toolbar .setup-cluster #setup-name { width:70px; }
+ .setup-cluster .add-setup-button { padding:4px 5px; font-size:10px; }
+ .workspace-toolbar .canvas-actions { flex-wrap:wrap; gap:4px; }
+ .workspace-toolbar .setup-cluster { flex:1; }
+ .workspace-toolbar #reset-weights { width:26px; min-width:26px; }
+ .race-main-host .race-venue { grid-template-columns:1fr 1fr; grid-template-rows:minmax(200px,1fr) minmax(145px,.7fr) 42px; }
+ .race-main-host .circuit-stage { grid-row:1; grid-column:1/-1; }
+ .race-main-host .circuit-grandstand { grid-row:2; }
+ .race-main-host .grandstand-left { grid-column:1; }.race-main-host .grandstand-right { grid-column:2; }
+ .race-main-host .circuit-window { grid-row:3; }
+ .race-main-host .grandstand-metric { height:37px; min-height:37px; grid-template-rows:24px 10px; }
+ .race-main-host .grandstand-seats { height:9px; }
+}
+@media(max-width:520px) {
+ .reverse-workbench { width:calc(100vw - 12px); height:620px; }
+ #reverse-pane .inverse-grid { grid-template-columns:1fr; grid-template-rows:minmax(180px,1fr) minmax(180px,1fr); }
+ #reverse-pane .inverse-input { border-right:0; border-bottom:1px solid #3c4757; }
+ #reverse-pane .inverse-input::after { display:none; }
+ #reverse-pane .panel { padding:8px; }
+ .workspace-toolbar .setup-cluster #setup-name { width:65px; }
+ .workspace-toolbar #language-select { width:78px; }
+}
+.race-venue .circuit-window { position:relative; z-index:3; left:auto; bottom:auto; background:#0c151ce8; border-top-color:#52606a; }
+.filters-body .year-range-filter { box-shadow:none; border:0; }
+.filters-body .year-range-filter label { align-items:stretch; color:#b9c5d2; letter-spacing:0; }
+.filters-body .year-range-filter .range-title { display:block; text-transform:none; letter-spacing:0; font-weight:500; }
+.filters-body .filter-grid label { letter-spacing:0; color:#b9c5d2; font-weight:500; }
+.filters-body #reset-year-range { height:18px; border:0; }
+.filters-body .filter-footer { border:0; }
+.grandstand-adjust input[type=range]::-webkit-slider-runnable-track { background:linear-gradient(to right,var(--segment) var(--weight-fill,0%),#424852 var(--weight-fill,0%)); }
+.grandstand-adjust input[type=range]::-webkit-slider-thumb { background:var(--segment); }
+.grandstand-adjust input[type=range]::-moz-range-progress,.grandstand-adjust input[type=range]::-moz-range-thumb { background:var(--segment); }
+/* The solver grows only when it has matching weights to inspect. */
+.reverse-workbench:has(#inverse-result:empty) { width:340px; height:370px; }
+.reverse-workbench:has(#inverse-result:empty) .inverse-grid { grid-template-columns:1fr!important; grid-template-rows:1fr!important; }
+.reverse-workbench:has(#inverse-result:empty) .inverse-output { display:none!important; }
+.reverse-workbench:has(#inverse-result:empty) .inverse-input { border:0!important; }
+.reverse-workbench:has(#inverse-result:empty) .inverse-input::after { display:none!important; }
+#reverse-pane .inverse-picker .inverse-search-wrap { grid-column:1; grid-row:1; }
+#reverse-pane .inverse-picker #inverse-add { grid-column:2; grid-row:1; width:auto; }
+#reverse-pane .inverse-picker #inverse-driver { display:none; }
+@media(prefers-reduced-motion:no-preference) { .reverse-workbench { transition:width .22s ease,height .22s ease; } }
+.race-venue::before { background-size:100% 100%; }
+.race-venue.is-vertical::before { background-image:linear-gradient(#08101633,#08101655),url('./assets/studio/circuit-grounds-vertical.svg'); }
+@media(max-width:720px) { .race-main-host .race-venue { grid-template-rows:minmax(210px,.8fr) minmax(180px,1fr) 42px; } }
+.reverse-workbench:has(#inverse-list.is-empty) { height:235px; }
+.filters-body #period-popover { margin:8px 0 0; padding:0; border:0; }
+.filters-body #filter-drawer { margin:8px 0 0; padding:8px 0 0; border-top:1px solid #34404d; }
+.filters-body .year-range-filter label { flex-direction:row; align-items:center; gap:5px; }
+.filters-body .year-range-filter label span { flex:none; }
+/* A name-only microtip, rather than a documentation panel. */
+#metric-tooltip.is-metric-hint { width:max-content; max-width:min(230px,calc(100vw - 16px)); padding:6px 9px; font-size:11px; line-height:1.45; border:1px solid #596b77; border-radius:3px; background:#18232d; box-shadow:0 3px 12px #0007; }
+/* A roof, raked terraces and a low control deck form each grandstand. */
+.circuit-grandstand { gap:7px; padding:7px 3px; }
+.grandstand-card.weight-control { position:relative; height:76px; min-height:76px; padding:0 5px 3px; border:0; border-radius:0; background:transparent; isolation:isolate; filter:drop-shadow(0 3px 2px #0009); }
+.grandstand-card::before { content:''; position:absolute; inset:0; z-index:-1; pointer-events:none; clip-path:polygon(9% 0,91% 0,100% 23%,96% 96%,4% 96%,0 23%); background:linear-gradient(180deg,#82909a 0 2px,#35434d 2px 25px,#101a21 25px 66px,var(--segment) 66px 69px,#081015 69px); }
+.grandstand-card::after { content:''; position:absolute; inset:25px 8px 27px; z-index:-1; pointer-events:none; border:1px solid #81919e55; border-top:0; transform:perspective(100px) rotateX(24deg); background:repeating-linear-gradient(0deg,#62728055 0 1px,#17232c 1px 5px); }
+.grandstand-card .grandstand-metric,.race-main-host .grandstand-metric { height:46px; min-height:46px; grid-template-rows:23px 19px; padding:1px 10px 2px; border:0; }
+.grandstand-card .grandstand-name { font-size:10px; line-height:11px; }
+.grandstand-card .grandstand-metric:hover,.grandstand-card .grandstand-metric:focus-visible { background:transparent; }
+.grandstand-card:hover::before,.grandstand-card:focus-within::before { background:linear-gradient(180deg,var(--segment) 0 2px,#435461 2px 25px,#15242e 25px 66px,var(--segment) 66px 69px,#081015 69px); }
+.grandstand-card .grandstand-seats,.race-main-host .grandstand-seats { height:18px; gap:2px; padding:2px 3px 0; transform:perspective(80px) rotateX(22deg); opacity:.95; }
+.grandstand-card .grandstand-seats i { background:repeating-linear-gradient(0deg,transparent 0 1px,var(--segment) 1px 3px,transparent 3px 5px); border-right:2px dotted #15212d; border-radius:0; }
+.grandstand-card .grandstand-adjust { padding:1px 6px; grid-template-columns:minmax(30px,1fr) 40px 19px; gap:3px; }
+.grandstand-adjust input[type=number] { width:40px; height:21px; }
+.grandstand-card.is-disabled::before { background:linear-gradient(180deg,#53616c 0 2px,#26323b 2px 25px,#111a21 25px 66px,#53616c 66px 69px,#081015 69px); }
+.grandstand-card.is-disabled .grandstand-seats { opacity:.18; }
+/* One line per driver: identity, score, then movement. */
+.circuit-score-key { height:22px; margin-bottom:5px; padding:1px 6px 5px; color:#aebfcd; font-size:10px; }
+.circuit-identity { grid-template-columns:18px minmax(0,1fr) 35px 22px; grid-template-rows:1fr; height:28px; padding:0 5px; gap:5px; font-size:11px; }
+.circuit-identity .circuit-rank,.circuit-identity .circuit-name,.circuit-identity strong,.circuit-identity .circuit-delta { grid-column:auto; grid-row:1; }
+.circuit-identity strong { text-align:right; font-size:12px; font-weight:650; color:#eff5fa; white-space:nowrap; }
+.circuit-roster-row { border-left:2px solid var(--team); border-bottom:1px solid #4b5c6726; background:#0d1820c9; }
+.circuit-rank { font-size:10px; }
+.is-vertical .circuit-identity { grid-template-columns:12px minmax(0,1fr) 43px 12px; grid-template-rows:1fr; height:25px; padding:0 3px; gap:2px; }
+.is-vertical .circuit-name { font-size:9px; }
+.is-vertical .circuit-identity strong { font-size:10px; }
+.is-vertical .circuit-comparison-delta { margin-left:3px; font-size:8px; }
+.is-vertical .circuit-delta { font-size:8px; }
+/* Portrait cards fit their track; the full grid is fitted on membership/resize. */
+.has-rank-trace #comparison-chart { padding:12px 16px 44px; }
+.comparison-board.circuit-board { display:grid; gap:14px; margin:0 auto; }
+.circuit-board .comparison-column { transform-origin:top left; }
+.circuit-board .comparison-column-head { padding:7px 8px; gap:5px; }
+.circuit-board .scenario-title { min-width:0; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.circuit-board .comparison-reference { font-size:8px; }
+.circuit-board .column-actions { flex:none; gap:3px; }
+.circuit-board .column-flag { display:none; }
+/* Profile: a padded identity card, aligned statistics and a readable biography. */
+.circuit-profile { width:min(420px,calc(100vw - 16px)); padding:0; border:1px solid #536776; border-top:2px solid #f00827; border-radius:8px; background:#111b24fa; }
+.circuit-profile .driver-detail-inner { border:0; padding:18px!important; gap:16px; background:none; }
+.circuit-profile .detail-identity { align-items:center; gap:14px; padding-right:24px; }
+.circuit-profile .detail-identity .driver-portrait { width:72px; height:84px; flex:none; border:0; border-bottom:2px solid var(--team); background:linear-gradient(140deg,color-mix(in srgb,var(--team) 22%,#15212a),#111b24); }
+.circuit-profile .detail-identity h4 { font-size:18px; line-height:1.15; margin:5px 0 8px; }
+.circuit-profile .detail-stats { gap:1px; border:1px solid #394956; border-radius:4px; overflow:hidden; background:#394956; }
+.circuit-profile .detail-stats>div { border:0; padding:9px 10px; background:#15212b; }
+.circuit-profile .detail-stats strong { font-size:17px; font-style:normal; }
+.circuit-profile .detail-stats span { font-size:10px; color:#adbecb; }
+.circuit-profile .detail-copy { border:0; padding:0 2px; margin:0; }
+.circuit-profile .detail-copy p { margin:0 0 10px; font-size:12px; line-height:1.65; color:#c9d5df; max-height:132px; }
+.circuit-profile .detail-copy small { display:block; margin-top:10px; font-size:9px; line-height:1.5; color:#7f95a8; }
+.circuit-profile .detail-copy a { font-size:11px; }
+.circuit-profile .profile-close { top:9px; right:9px; border:0; background:#253641; }
+@media(max-width:720px) { .race-main-host .grandstand-metric { grid-template-rows:23px 19px; }.race-main-host .grandstand-seats { height:18px; } }
+/* Use the full infield width when two columns would truncate identities. */
+.race-venue:not(.is-vertical) .circuit-infield { container-type:inline-size; }
+.race-venue:not(.is-vertical) .circuit-roster { grid-template-columns:1fr; gap:1px; }
+.race-venue:not(.is-vertical) .circuit-identity { min-height:16px; height:16px; }
+.race-venue:not(.is-vertical) .circuit-score-key { height:19px; margin-bottom:4px; }
+@container(min-width:550px) {
+ .race-venue:not(.is-vertical) .circuit-roster { grid-template-columns:1fr 1fr; gap:4px 12px; }
+ .race-venue:not(.is-vertical) .circuit-identity { min-height:28px; height:28px; }
+}
+.circuit-profile { max-height:min(520px,calc(100dvh - 16px)); }
+.grandstand-card.is-linked-metric { filter:drop-shadow(0 0 5px var(--segment)); }
+.grandstand-card.is-linked-metric::before { background:linear-gradient(180deg,var(--segment) 0 3px,#536877 3px 25px,#21343e 25px 66px,var(--segment) 66px 69px,#081015 69px); }
+.metric-cell.is-linked-metric,.metric-heading.is-linked-metric { background:color-mix(in srgb,var(--segment) 16%,#101a24)!important; box-shadow:inset 2px 0 var(--segment),inset -2px 0 var(--segment); }
+/* Solver values, feasible intervals and sliders occupy separate lines. */
+#reverse-pane .inverse-weight-row { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto 18px; height:76px; min-height:76px; gap:3px; padding:6px 8px; overflow:hidden; }
+#reverse-pane .inverse-weight-detail { grid-column:1; grid-row:1; min-width:0; }
+#reverse-pane .inverse-vertical-control { grid-column:1; grid-row:2; display:block; width:100%; height:18px; }
+#reverse-pane .inverse-vertical-control input[type=range] { writing-mode:horizontal-tb; direction:ltr; width:100%; height:16px; margin:0; }
+#reverse-pane .inverse-slider-min,#reverse-pane .inverse-slider-max { display:none; }
+#reverse-pane .inverse-weight-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; line-height:16px; }
+#reverse-pane .inverse-weight-heading label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#reverse-pane .inverse-weight-value { flex:none; font-size:12px; font-variant-numeric:tabular-nums; }
+#reverse-pane .inverse-feasible-track { height:4px; margin:5px 0 2px; }
+#reverse-pane .inverse-weight-range { display:block; line-height:12px; font-size:9px; font-variant-numeric:tabular-nums; color:#b4c3cf; }
+#reverse-pane .inverse-weight-row.is-fixed .inverse-feasible-track { opacity:.45; }
+.driver-wheel { grid-column:3; grid-row:1/3; width:100%; max-width:460px; min-width:0; }
+.driver-wheel svg { display:block; width:100%; height:auto; }
+.wheel-rim { fill:#11161b; stroke:#52616d; stroke-width:2; }
+.wheel-grip { fill:#26323b; stroke:#687984; stroke-width:1; }
+.wheel-trim { stroke:#ec2343; stroke-width:5; fill:none; }
+.wheel-screen { fill:#09171b; stroke:#354c55; }
+.wheel-grid { fill:none; stroke:#46616a; stroke-width:.6; }
+.wheel-axis { fill:none; stroke:#35515b; stroke-width:.7; }
+.wheel-value { fill:#e82a4933; stroke:#ff526b; stroke-width:2; stroke-linejoin:round; }
+.wheel-label { fill:#c4d3dd; font-size:10px; }
+.wheel-number { font-size:14px; font-weight:650; font-variant-numeric:tabular-nums; }
+.wheel-scale { fill:#91a8b6; font-size:9px; }
+.circuit-profile .driver-wheel { grid-column:1; grid-row:2; margin:-5px 0; }
+.circuit-profile .detail-copy { grid-row:3; }
+@media(max-width:1100px) { .driver-wheel { grid-column:1/-1; grid-row:auto; justify-self:center; } }
+/* One control cycles all three ranking presentations. */
+.workspace-toolbar #shape-toggle { display:flex; align-items:center; gap:7px; width:auto; min-width:0; height:32px; padding:5px 9px; background:#17212a; border:1px solid #677581; color:#e5edf3; white-space:nowrap; }
+#shape-toggle span { font-size:11px; }#shape-toggle small { color:#96a9b8; font-size:9px; }
+#shape-toggle .studio-icon { width:16px; height:16px; }
+/* Fit every grandstand into its side; controls have their own solid deck. */
+.race-main-host .circuit-grandstand { display:grid; grid-template-rows:repeat(var(--stand-count,7),minmax(0,1fr)); gap:4px; padding:4px 3px; overflow:hidden; }
+.race-main-host .grandstand-card { display:grid; align-items:stretch; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) 24px; height:auto; min-height:0; padding:0 5px 3px; }
+.race-main-host .grandstand-card::before { background:linear-gradient(180deg,#82909a 0 2px,#35434d 2px 28%,#101a21 28% 100%); }
+.race-main-host .grandstand-card::after { inset:22px 8px 27px; }
+.race-main-host .grandstand-metric { height:auto; min-height:0; grid-template-rows:20px minmax(0,1fr); padding:1px 9px 3px; overflow:hidden; }
+.race-main-host .grandstand-seats { height:100%; min-height:0; max-height:23px; align-self:end; }
+.race-main-host .grandstand-adjust { position:relative; background:#101b23; padding:2px 5px; border-top:1px solid #465864; border-bottom:2px solid var(--segment); align-self:stretch; }
+.race-main-host .grandstand-adjust input[type=number] { height:18px; }
+.race-main-host .grandstand-adjust .weight-reset { height:18px; min-height:18px; }
+/* Compact profile: wheel and labelled values are adjacent, never overlapping. */
+.driver-wheel { display:grid; grid-template-columns:minmax(140px,1fr) minmax(130px,1fr); align-items:center; gap:8px; max-width:480px; }
+.driver-wheel svg { min-width:0; }
+.wheel-index { font-size:11px; font-weight:700; }
+.wheel-readouts { display:grid; gap:4px; min-width:0; }
+.wheel-readouts>div { display:grid; grid-template-columns:14px minmax(0,1fr) auto; align-items:center; gap:5px; border-bottom:1px solid #354552; min-height:22px; }
+.wheel-readouts i { font-size:9px; color:var(--segment); font-style:normal; }
+.wheel-readouts span { font-size:10px; color:#bdced9; line-height:1.2; }
+.wheel-readouts strong { font-size:12px; color:var(--segment); font-variant-numeric:tabular-nums; }
+.circuit-profile { width:min(460px,calc(100vw - 16px)); max-height:none; overflow:visible; }
+.circuit-profile .driver-detail-inner { padding:12px!important; gap:10px; }
+.circuit-profile .detail-identity .driver-portrait { width:45px; height:52px; }
+.circuit-profile .detail-identity h4 { font-size:16px; margin:3px 0 5px; }
+.circuit-profile .driver-wheel { margin:0; }
+.circuit-profile .detail-copy p { font-size:11px; line-height:1.5; max-height:none; overflow:visible; margin-bottom:5px; }
+.circuit-profile .detail-copy small { margin-top:5px; font-size:8px; }
+.circuit-profile .detail-copy a { font-size:10px; }
+@media(max-width:720px) {
+ .workspace-toolbar #shape-toggle { margin-right:80px; }
+ .race-main-host .race-venue { grid-template-rows:minmax(140px,.65fr) minmax(0,1fr) 36px; }
+ .race-main-host .circuit-grandstand { gap:3px; padding:2px; }
+ .race-main-host .grandstand-card { grid-template-rows:minmax(0,1fr) 21px; padding:0 3px 2px; }
+ .race-main-host .grandstand-metric { grid-template-rows:16px minmax(0,1fr); padding:0 8px 1px; }
+ .race-main-host .grandstand-name { font-size:9px; line-height:9px; }
+ .race-main-host .grandstand-adjust { padding:0 4px; }
+ .race-main-host .grandstand-card::after { inset:17px 8px 24px; }
+ .circuit-profile .driver-wheel { grid-template-columns:minmax(120px,1fr) minmax(140px,1fr); gap:4px; }
+ .circuit-profile .wheel-readouts span { font-size:9px; }
+}
+@media(max-height:500px) { .circuit-profile .detail-copy p { display:none; } }
+/* Inline details share the same compact radar without squeezing its readouts. */
+.driver-detail .driver-detail-inner { grid-template-columns:190px minmax(160px,1fr) minmax(330px,400px); grid-template-rows:auto; gap:16px; }
+.driver-detail .detail-identity,.driver-detail .detail-copy,.driver-detail .driver-wheel { grid-row:1; min-width:0; }
+.driver-detail .detail-identity { grid-column:1; }
+.driver-detail .detail-copy { grid-column:2; }
+.driver-detail .driver-wheel { grid-column:3; }
+.driver-detail .detail-identity h4 { font-size:16px; overflow-wrap:anywhere; }
+@media(max-width:1000px) {
+ .driver-detail .driver-detail-inner { grid-template-columns:minmax(180px,1fr) minmax(300px,1fr); }
+ .driver-detail .detail-copy { grid-column:1; grid-row:2; }
+ .driver-detail .driver-wheel { grid-column:2; grid-row:1/3; }
+}
+@media(max-width:720px) {
+ .driver-detail .driver-detail-inner { display:flex; flex-direction:column; gap:10px; }
+ .driver-detail .driver-wheel { width:100%; max-width:420px; grid-template-columns:minmax(110px,1fr) minmax(140px,1fr); }
+}
+.driver-detail .driver-detail-inner { width:min(100%,calc(100vw - 54px)); box-sizing:border-box; }
+
+/* The compact dock reserves real space for seats and a separate control deck. */
+.workspace-toolbar #shape-toggle { width:34px; min-width:34px; padding:6px; justify-content:center; }
+.workspace-toolbar #shape-toggle .studio-icon { width:21px; height:21px; }
+.metric-dock .grandstand-card.weight-control { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:50px 26px; align-items:stretch; gap:5px; height:87px; min-height:87px; padding:0 5px 4px; }
+.metric-dock .grandstand-card::before { clip-path:polygon(9% 0,91% 0,100% 23%,96% 96%,4% 96%,0 23%); bottom:34px; background:linear-gradient(#82909a 0 2px,#35434d 2px 25px,#101a21 25px); }
+.metric-dock .grandstand-card::after { inset:25px 8px 35px; }
+.metric-dock .grandstand-card .grandstand-metric { height:50px; min-height:50px; grid-template-rows:23px 23px; padding:1px 10px 3px; }
+.metric-dock .grandstand-card .grandstand-seats { height:21px; max-height:21px; padding:1px 3px; }
+.metric-dock .grandstand-adjust { padding:2px 5px; background:#111c24; border:1px solid #41525e; border-bottom:2px solid var(--segment); border-radius:2px; }
+.metric-dock .grandstand-adjust input[type=number] { height:20px; }
+.metric-dock .grandstand-adjust .weight-reset { height:20px; min-height:20px; }
+/* Transform-only contribution motion avoids per-frame flex layout. */
+.stack-segment { transition:filter .18s ease; }
+.race-car { transition:none; }
+.circuit-roster-row { backdrop-filter:none; }
+.race-venue[data-animating="true"] .circuit-driver { transition:none; }

@@ -1,4 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" fill="none">
+ <symbol id="circuit-view" viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="5" width="19" height="14" rx="7"/><rect x="6" y="8.5" width="12" height="7" rx="3.5"/><path d="M12 5v3.5" stroke-dasharray="1 1"/></g></symbol>
+ <symbol id="lineup-view" viewBox="0 0 24 24"><g fill="currentColor"><rect x="3" y="5" width="4" height="3"/><rect x="8" y="5" width="13" height="3" opacity=".6"/><rect x="3" y="10.5" width="8" height="3"/><rect x="12" y="10.5" width="6" height="3" opacity=".6"/><rect x="3" y="16" width="5" height="3"/><rect x="9" y="16" width="5" height="3" opacity=".6"/></g></symbol>
+ <symbol id="table-view" viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14.5h18M9 4v16M15 9v11"/></g></symbol>
  <symbol id="reset" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6"/></g></symbol>
  <symbol id="expand" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-6 6M10 20H4v-6M4 20l6-6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
  <symbol id="collapse" viewBox="0 0 24 24"><path d="M20 4l-6 6m0-6v6h6M4 20l6-6m-6 0h6v6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>

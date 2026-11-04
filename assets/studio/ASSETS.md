@@ -8,3 +8,5 @@
 - Symbols: consistent control icons, podium wreath and detailed ranking car sprite.
 
 These additions share the project's existing red, black, white, and metric colors. Decorative artwork is hidden from assistive technology and does not intercept canvas interactions.
+
+- `circuit-grounds.svg` and `circuit-grounds-vertical.svg`: original aerial venue artwork with service roads, pit garages, spectator stands, parking, trees and lighting. Drawn locally for this project; no external imagery or official branding.

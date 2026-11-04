@@ -221,4 +221,33 @@ const AUDIT_UI = {
   }
 };
 Object.entries(AUDIT_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,copy));
+const CIRCUIT_UI = {
+  en: ["Traditional LineUp", "Race circuit", "Previous eight drivers", "Next eight drivers", "Race circuit. Scroll or use arrow keys to move through drivers; Page Up/Down moves eight.", "Each lane is a normalized 0–100 score. Longer coloured trails mean higher scores, not physical race distance."],
+  zh: ["传统 LineUp", "环形赛道", "前八位车手", "后八位车手", "赛车跑道。滚轮或方向键逐位切换车手；Page Up/Down 切换八位。", "每条跑道均代表归一化 0–100 分。彩色轨迹越长表示分数越高，不代表实际比赛距离。"],
+  ja: ["従来の LineUp", "サーキット", "前の8人", "次の8人", "スクロールまたは矢印キーで移動。Page Up/Down は8人ずつ。", "各レーンは正規化スコア0–100。色の軌跡はスコアを表し、実際の走行距離ではありません。"],
+  fr: ["LineUp classique", "Circuit", "8 pilotes précédents", "8 pilotes suivants", "Défilement ou flèches pour parcourir les pilotes ; Page haut/bas par huit.", "Chaque piste représente un score normalisé de 0 à 100, pas une distance de course réelle."],
+  ko: ["기존 LineUp", "레이스 서킷", "이전 8명", "다음 8명", "스크롤 또는 방향키로 이동, Page Up/Down으로 8명씩 이동합니다.", "각 레인은 정규화 점수 0–100입니다. 색상 궤적은 실제 거리가 아닌 점수를 나타냅니다."],
+  hi: ["पारंपरिक LineUp", "रेस सर्किट", "पिछले आठ ड्राइवर", "अगले आठ ड्राइवर", "स्क्रॉल या तीर से ड्राइवर बदलें; Page Up/Down से आठ बदलें।", "हर लेन का स्कोर 0–100 है। रंगीन पथ स्कोर दिखाता है, वास्तविक रेस दूरी नहीं।"]
+};
+Object.entries(CIRCUIT_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,Object.fromEntries(['showLineup','showCircuit','previousGrid','nextGrid','circuitAria','circuitScale'].map((key,i)=>[key,copy[i]]))));
+const CIRCUIT_ZOOM_UI = {
+  en:['Zoom in on circuit','Zoom out of circuit','Fit circuit to view'],
+  zh:['放大跑道','缩小跑道','跑道适应视图'],
+  ja:['サーキットを拡大','サーキットを縮小','全体を表示'],
+  fr:['Agrandir le circuit','Réduire le circuit','Ajuster le circuit à la vue'],
+  ko:['서킷 확대','서킷 축소','서킷을 화면에 맞추기'],
+  hi:['सर्किट बड़ा करें','सर्किट छोटा करें','सर्किट को दृश्य में फ़िट करें']
+};
+Object.entries(CIRCUIT_ZOOM_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,Object.fromEntries(['circuitZoomIn','circuitZoomOut','circuitFit'].map((key,i)=>[key,copy[i]]))));
+const RANK_TRACE_UI = {
+  en:['Reference','Rank versus {name}','Locate {name} in {setup}'],
+  zh:['基准','相对「{name}」的名次变化','在「{setup}」中定位 {name}'],
+  ja:['基準','{name}に対する順位差','{setup}で{name}を表示'],
+  fr:['Référence','Écart de rang par rapport à {name}','Repérer {name} dans {setup}'],
+  ko:['기준','{name} 대비 순위 차이','{setup}에서 {name} 찾기'],
+  hi:['संदर्भ','{name} की तुलना में स्थान','{setup} में {name} दिखाएँ']
+};
+Object.entries(RANK_TRACE_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,Object.fromEntries(['rankReference','rankComparedTo','locateRankDriver'].map((key,i)=>[key,copy[i]]))));
+const PADDOCK_UI={en:['Add ranking','Duplicate these weights into a new ranking and compare'],zh:['新增排名','复制当前权重，新增排名并进入比较'],ja:['ランキング追加','現在の重みを複製して比較'],fr:['Ajouter un classement','Dupliquer ces poids pour comparer'],ko:['순위 추가','현재 가중치를 복제하여 비교'],hi:['रैंकिंग जोड़ें','इन भारों की प्रतिलिपि बनाकर तुलना करें']};
+Object.entries(PADDOCK_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,{addRanking:copy[0],addRankingHint:copy[1]}));
 window.APEX_I18N = {metricKeys: I18N_METRIC_KEYS, locales: APEX_I18N};

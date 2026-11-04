@@ -196,7 +196,7 @@ window.APEX_INVERSE = (() => {
   function renderList() {
     const rows = selectedRows();
     $("#inverse-list").classList.toggle("is-empty", rows.length === 0);
-    $("#inverse-list").dataset.placeholder = api.t("dropDrivers");
+    $("#inverse-list").dataset.placeholder = api.t("inverseSearch");
     $("#inverse-list").innerHTML = rows.map((row, index) => `<li draggable="true" data-inverse-index="${index}"><span class="inverse-grip" aria-hidden="true">⋮⋮</span><span class="inverse-rank">${index + 1}</span><span class="inverse-name">${api.escapeHTML(row.full_name)}<small>${api.driverIdentity(row)}</small></span><div class="inverse-actions"><button type="button" data-inverse-action="up" data-index="${index}" ${index === 0 ? "disabled" : ""} aria-label="${api.escapeHTML(api.t("inverseMoveUp", {name: row.full_name}))}">↑</button><button type="button" data-inverse-action="down" data-index="${index}" ${index === rows.length - 1 ? "disabled" : ""} aria-label="${api.escapeHTML(api.t("inverseMoveDown", {name: row.full_name}))}">↓</button><button type="button" data-inverse-action="remove" data-index="${index}" aria-label="${api.escapeHTML(api.t("inverseRemove", {name: row.full_name}))}">×</button></div></li>`).join("");
   }
 
@@ -227,10 +227,11 @@ window.APEX_INVERSE = (() => {
       slider.max = String(max);
       slider.value = String(weights[index]);
       slider.disabled = min === max;
+      row.classList.toggle("is-fixed",min===max);
       row.querySelector(".inverse-slider-max").textContent = max.toFixed(1);
       row.querySelector(".inverse-slider-min").textContent = min.toFixed(1);
       row.querySelector(".inverse-weight-value").textContent = `${weights[index].toFixed(1)}%`;
-      row.querySelector(".inverse-weight-range").textContent = `${min.toFixed(1)}–${max.toFixed(1)}%`;
+      row.querySelector(".inverse-weight-range").textContent = min===max?`${min.toFixed(1)}%`:`${min.toFixed(1)}–${max.toFixed(1)}%`;
       const track = row.querySelector(".inverse-feasible-track");
       track.style.setProperty("--low", `${min}%`);
       track.style.setProperty("--width", `${Math.max(0, max - min)}%`);
@@ -346,23 +347,16 @@ window.APEX_INVERSE = (() => {
       row.classList.add("is-dragging");
     });
     $("#inverse-list").addEventListener("dragover", (event) => {
-      if (draggedIndex === null && !Array.from(event.dataTransfer.types).includes("application/x-apex-driver")) return;
+      if (draggedIndex === null) return;
       event.preventDefault();
-      event.dataTransfer.dropEffect = draggedIndex === null ? "copy" : "move";
+      event.dataTransfer.dropEffect = "move";
       clearDropStyles();
       const row = event.target.closest("li[data-inverse-index]");
       if (!row) return;
       row.classList.add(event.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2 ? "drop-after" : "drop-before");
     });
     $("#inverse-list").addEventListener("drop", (event) => {
-      if (draggedIndex === null) {
-        const id = event.dataTransfer.getData("application/x-apex-driver");
-        if (!id) return;
-        event.preventDefault();
-        const row = event.target.closest("li[data-inverse-index]");
-        const at = row ? Number(row.dataset.inverseIndex) + Number(event.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2) : selected.length;
-        addDriver(id, at); clearDropStyles(); return;
-      }
+      if (draggedIndex === null) return;
       event.preventDefault();
       const row = event.target.closest("li[data-inverse-index]");
       const target = row ? Number(row.dataset.inverseIndex) + Number(event.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2) : selected.length;
