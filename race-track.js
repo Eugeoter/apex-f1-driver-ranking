@@ -352,7 +352,7 @@ window.APEX_TRACK = (() => {
       options.metrics.forEach(metric=>{
         let segment=node.parts.get(metric.key);
         if(!segment){segment=svg('path',{class:'circuit-segment','data-segment-metric':metric.key});segment.append(svg('title'));node.parts.set(metric.key,segment);node.segments.append(segment);}
-        segment.style.stroke=metric.color;segment.firstChild.textContent=options.segmentTitle(item.driver,metric.key,item.values[metric.key]||0);
+        segment.style.stroke=window.APEX_METRIC_TEXTURES.stroke(scene.canvas,metric.key,metric.color);segment.firstChild.textContent=options.segmentTitle(item.driver,metric.key,item.values[metric.key]||0);
       });
       for(const [key,part] of node.parts)if(!options.metrics.some(m=>m.key===key)){part.remove();node.parts.delete(key);}
       return {node,item,points:geometry(item.lane,scene.vertical,scene.w),values:item.values,score:item.score,opacity:1};
@@ -420,7 +420,7 @@ window.APEX_TRACK = (() => {
     before.forEach((from,key)=>{
       const to=after.get(key);if(!to)return;
       const lane=svg('path',{class:'circuit-lane'}),parts=[];
-      Object.keys(to.values).forEach(metric=>{const p=svg('path',{class:'circuit-segment',stroke:to.colors?.[metric]||from.colors?.[metric]||'#ccc'});overlay.append(p);parts.push([metric,p]);});
+      Object.keys(to.values).forEach(metric=>{const p=svg('path',{class:'circuit-segment',stroke:window.APEX_METRIC_TEXTURES.stroke(overlay,metric,to.colors?.[metric]||from.colors?.[metric]||'#ccc')});overlay.append(p);parts.push([metric,p]);});
       overlay.prepend(lane);
       const car=svg('use',{href:'./assets/studio/icons.svg#race-car',x:-21,y:-10,width:42,height:20,color:to.team||from.team});overlay.append(car);
       matching.push({from,to,lane,parts,car});
