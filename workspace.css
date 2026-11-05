@@ -179,3 +179,10 @@ body:has(#reverse-panel:not([hidden])) .single-view,body:has(#reverse-panel:not(
   .detail-stats { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .lineup-table:not(.stacked-mode) .lineup-row>div:nth-child(-n+2) { position:static; }
 }
+
+.points-switch { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 12px; cursor: pointer; }
+.points-switch input { accent-color: #f00827; }
+@media(max-width:720px) {
+  .points-switch { max-width:29%; white-space:normal; font-size:11px; line-height:1.15; }
+  .points-switch input { flex:none; margin:0; }
+}

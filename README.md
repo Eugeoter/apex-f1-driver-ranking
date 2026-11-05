@@ -21,7 +21,7 @@ An interactive Formula 1 driver ranking tool. Explore how the order changes when
 - Metric switches sit above the rank/driver and score headings, leaving those headings adjacent to their data. The selected year range stays visible in the date control. Missing values and unscorable rows are distinguished from valid zero values; normalized data bars keep their scale and opacity when weights change.
 - Local nationality flags and 11 verified contemporary team marks replace repeated identity text. Unknown/historical team marks fall back to the team name; flags retain accessible country names. Sources and licenses are in `assets/identity/`.
 - Weight codes belong to the setup group in the top controls. The anchored popover separates read-only export from editable import, so pasting a code never replaces the current setup's export before validation.
-- Historical championship points are used throughout. Legacy weight codes remain importable; their former current-rules flag is ignored.
+- Historical championship points are the default. The switch next to the year range recalculates Grand Prix points, points per start, and team points share using a common scoring scale. Weight codes record the selected scoring mode.
 
 ## Run locally
 
