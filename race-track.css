@@ -201,7 +201,10 @@
 
 /* View and setup actions belong to the workspace, not the filtering drawer. */
 .workspace-toolbar { display:flex; align-items:center; gap:10px; flex:none; min-height:38px; margin-bottom:8px; }
-.workspace-toolbar .studio-mark { width:27px; height:27px; }
+.workspace-brand { display:flex; align-items:center; gap:6px; min-width:0; }
+.workspace-brand .studio-mark { flex:0 0 27px; width:27px; height:27px; margin:0; }
+.workspace-brand h1 { width:152px; min-width:0; margin:0; }
+.workspace-brand h1 img { display:block; width:100%; height:auto; }
 .workspace-toolbar .canvas-actions { display:flex; align-items:center; flex-wrap:nowrap; gap:9px; margin-left:auto; }
 .workspace-toolbar .setup-cluster #setup-name { width:112px; }
 .workspace-toolbar #language-select { height:30px; min-height:30px; width:110px; font-size:11px; }
@@ -579,7 +582,7 @@ button,input,select { line-height:1.2; }
 @media(max-width:720px){.workspace-toolbar {padding-right:0;}.workspace-toolbar #shape-toggle {margin-right:120px;}}
 .tool-rail #shape-toggle { width:34px; min-width:34px; height:34px; padding:6px; }
 .tool-rail #shape-toggle .studio-icon { width:21px; height:21px; }
-@media(max-width:850px){.workspace-toolbar {padding-right:0;}.workspace-toolbar .studio-mark {margin-right:168px;}}
+@media(max-width:850px){.workspace-toolbar {padding-right:0;}.workspace-brand {max-width:calc(100% - 168px);}}
 
 /* Metric inspection temporarily shares a straight baseline and physical scale. */
 .race-venue .circuit-infield,.race-venue .circuit-scenery { opacity:calc(1 - var(--alignment,0)); }
@@ -656,3 +659,32 @@ button,input,select { line-height:1.2; }
 .metric-cell .metric-track i { background-color:var(--segment); background-image:var(--metric-texture,none); background-repeat:repeat; }
 .grandstand-name::before { content:''; display:inline-block; width:14px; height:8px; margin-right:4px; border-radius:1px; vertical-align:baseline; background-color:var(--segment); background-image:var(--metric-texture,none); box-shadow:inset 0 0 0 1px #ffffff20; }
 .grandstand-card.is-disabled .grandstand-name::before { opacity:.25; }
+
+/* Keep interactive HTML outside SVG foreignObject for Safari compositing. */
+.circuit-infield-anchor { position:absolute; left:0; top:0; transform-origin:0 0; pointer-events:none; }
+.circuit-infield-anchor .circuit-roster-row { pointer-events:auto; }
+.roster-car { display:inline-block; width:24px; height:12px; margin-right:4px; vertical-align:middle; color:var(--team); }
+.is-vertical .roster-car { width:17px; height:9px; margin-right:2px; }
+.circuit-car { filter:none; }
+.circuit-car:hover,.circuit-car:focus-visible { filter:none; outline:1px solid #fff; }
+.ranking-context { display:flex; align-items:center; justify-content:space-between; gap:12px; flex:none; padding:7px 12px; border-bottom:1px solid #35414c; background:#10161c; font-size:11px; line-height:1.45; }
+.ranking-context strong { color:#edf3f7; font-size:13px; margin-right:12px; }
+.ranking-context span { color:#95a9b9; }
+.ranking-context p { margin:1px 0 0; color:#b2c1cd; }
+.ranking-context .metric-focus-caption { color:#95a9b9; min-height:16px; }
+.ranking-context button { flex:none; border:1px solid #f00827; background:#42151f; padding:7px 10px; color:#fff; }
+.column-actions [data-expand-scenario] { width:auto; white-space:nowrap; padding:4px 8px; font-size:10px; }
+@media(max-width:600px){.ranking-context {padding:5px 8px;gap:5px;font-size:10px;}.ranking-context span{display:block;}.ranking-context button{padding:5px;}}
+
+.roster-car { min-width:0!important; }
+.ranking-context .metric-focus-caption { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ranking-context>div { min-width:0; }
+
+/* Compact context dock: the chart keeps its uninterrupted top edge. */
+#ranking-context { order:10; min-height:30px; height:30px; padding:0 10px; gap:14px; border:0; border-top:1px solid #293640; background:#0c1218; font-size:10px; }
+#ranking-context button { display:inline-flex; align-items:center; gap:7px; min-height:24px; height:24px; padding:2px 7px; font-size:10px; line-height:16px; white-space:nowrap; border-radius:3px; }
+#ranking-context .ranking-method { padding-left:0; background:transparent; border-color:transparent; color:#d5e0e8; }
+#ranking-context .ranking-method:hover,#ranking-context .ranking-method:focus-visible { color:white; border-color:#526473; }
+#ranking-context .ranking-method span { color:#91a8ba; }
+#ranking-context .metric-focus-caption { flex:1; min-width:0; min-height:0; line-height:18px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+@media(max-width:600px){#ranking-context {gap:5px;padding:0 5px;}#ranking-context span {display:inline;}#ranking-context button {font-size:9px;gap:4px;padding:2px 4px;}}

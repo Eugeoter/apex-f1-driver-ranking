@@ -1,15 +1,22 @@
 "use strict";
-// Texture supplements the existing hue. Reuse just three surfaces, not 17 patterns.
+// Shared color and texture identity for every metric view.
 window.APEX_METRIC_TEXTURES=(()=>{
-  const styles={
-    points_per_start:'diagonal',win_rate:'dots',pole_positions:'diagonal',
-    average_qualifying_position:'diagonal',average_positions_gained:'dots',
-    finish_rate:'diagonal',team_points_share:'dots',race_pace_score:'dots',
-    lap_consistency_score:'diagonal',overtakes_per_start:'dots',net_overtakes_per_start:'diagonal'
+  // Exactly eight categorical hues. Each metric has a unique hue/surface pair.
+  const palette={points:'#fa4e55',starts:'#86d9ff',wins:'#ffc24b',podiums:'#d2a7ff',qualifying:'#ff8b4d',racecraft:'#43c4a7',grid:'#667fe0',reliability:'#a6d665'};
+  const encoding={
+    championship_points:['points','solid'],points_per_start:['points','diagonal'],team_points_share:['points','dots'],
+    race_starts:['starts','solid'],overtakes_per_start:['starts','diagonal'],net_overtakes_per_start:['starts','dots'],
+    wins:['wins','solid'],win_rate:['wins','diagonal'],
+    podiums:['podiums','solid'],podium_rate:['podiums','diagonal'],
+    pole_positions:['qualifying','solid'],race_pace_score:['qualifying','diagonal'],
+    average_finish_position:['racecraft','solid'],average_positions_gained:['racecraft','dots'],
+    average_qualifying_position:['grid','solid'],
+    finish_rate:['reliability','solid'],lap_consistency_score:['reliability','diagonal']
   };
+  const color=key=>palette[encoding[key]?.[0]||'points'];
   const ns='http://www.w3.org/2000/svg', brushes=new WeakMap(), images=new Map();
   let serial=0;
-  const kind=key=>styles[key]||'solid';
+  const kind=key=>encoding[key]?.[1]||'solid';
   const marks=type=>type==='diagonal'
     ? '<path d="M-2 2L2-2M0 8L8 0M6 10L10 6" fill="none" stroke="#101820" stroke-opacity=".36" stroke-width="1.6"/>'
     : '<circle cx="2" cy="2" r="1.2" fill="#101820" fill-opacity=".43"/><circle cx="6" cy="6" r="1.2" fill="#101820" fill-opacity=".43"/>';
@@ -33,5 +40,5 @@ window.APEX_METRIC_TEXTURES=(()=>{
     }
     return brush.colors.get(token);
   }
-  return {kind,css,stroke};
+  return {color,kind,css,stroke};
 })();

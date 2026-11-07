@@ -105,7 +105,9 @@ window.APEX_TRACK = (() => {
   function cancelProfile(scene) {
     clearTimeout(scene.hoverTimer);clearTimeout(scene.hideTimer);scene.popup.hidden=true;
   }
-  function highlight(key) {
+  let focusedDriver;
+  function highlight(key,force=false) {
+    if(focusedDriver===key&&!force)return;focusedDriver=key;
     document.querySelectorAll('.race-venue').forEach(venue=>{
       venue.classList.toggle('has-driver-focus',Boolean(key));
       venue.querySelectorAll('[data-flow-driver]').forEach(el=>el.classList.toggle('is-driver-focus',el.dataset.flowDriver===key));
@@ -121,11 +123,11 @@ window.APEX_TRACK = (() => {
     scene.scenery=svg('g',{class:'circuit-scenery','aria-hidden':'true'});
     scene.canvas.append(scene.scenery);scene.layer=svg('g',{class:'circuit-racers'});scene.markers=svg('g',{class:'circuit-racers circuit-markers'});
     scene.infield=document.createElement('div');scene.infield.className='circuit-infield';
-    scene.foreign=svg('foreignObject',{class:'circuit-infield-anchor'});scene.foreign.append(scene.infield);
-    scene.canvas.append(scene.layer,scene.foreign,scene.markers);
+    scene.foreign=document.createElement('div');scene.foreign.className='circuit-infield-anchor';scene.foreign.append(scene.infield);
+    scene.canvas.append(scene.layer,scene.markers);
     scene.alignmentGuide=svg('g',{class:'circuit-alignment-guide','aria-hidden':'true'});scene.canvas.append(scene.alignmentGuide);
     scene.stage=document.createElement('div');scene.stage.className='circuit-stage';
-    scene.camera=document.createElement('div');scene.camera.className='circuit-camera';scene.camera.append(scene.canvas);scene.stage.append(scene.camera);
+    scene.camera=document.createElement('div');scene.camera.className='circuit-camera';scene.camera.append(scene.canvas,scene.foreign);scene.stage.append(scene.camera);
     scene.left=document.createElement('div');scene.left.className='circuit-grandstand grandstand-left';
     scene.right=document.createElement('div');scene.right.className='circuit-grandstand grandstand-right';
     scene.controls=document.createElement('div');scene.controls.className='circuit-window';
@@ -144,9 +146,9 @@ window.APEX_TRACK = (() => {
     scene.popup=document.createElement('div');scene.popup.className='circuit-profile';scene.popup.hidden=true;scene.popup.setAttribute('role','dialog');
     document.body.append(scene.popup);
     scene.popup.addEventListener('click',e=>{if(e.target.closest('.profile-close')){cancelProfile(scene);highlight(null);}});
-    host.addEventListener('mouseover',e=>{const target=e.target.closest('[data-race-driver]');if(target){highlight(target.dataset.raceDriver);scene.options.onFocus?.(target.dataset.raceDriver);}});
+    host.addEventListener('mouseover',e=>{const target=e.target.closest('[data-race-driver]');if(target&&target.dataset.raceDriver!==focusedDriver){highlight(target.dataset.raceDriver);scene.options.onFocus?.(target.dataset.raceDriver);}});
     host.addEventListener('mouseout',e=>{if(scene.popup.hidden&&!e.relatedTarget?.closest?.('[data-race-driver]'))highlight(null);});
-    host.addEventListener('focusin',e=>{const target=e.target.closest('[data-race-driver]');if(target){highlight(target.dataset.raceDriver);scene.options.onFocus?.(target.dataset.raceDriver);}});
+    host.addEventListener('focusin',e=>{const target=e.target.closest('[data-race-driver]');if(target&&target.dataset.raceDriver!==focusedDriver){highlight(target.dataset.raceDriver);scene.options.onFocus?.(target.dataset.raceDriver);}});
     host.addEventListener('click',e=>{
       const metric=e.target.closest('[data-toggle-metric]');
       if(metric){e.stopPropagation();scene.options.toggleMetric(metric.dataset.toggleMetric);return;}
@@ -197,11 +199,14 @@ window.APEX_TRACK = (() => {
   function layout(scene) {
     if(!scene.stage.clientWidth||!scene.stage.clientHeight)return;
     const width=scene.vertical?440:Math.round(clamp(scene.stage.clientWidth/scene.stage.clientHeight*500,800,1600));
+    const fieldBox=infieldBounds(scene.vertical,width),viewHeight=(scene.vertical?660:500)+36;
+    const scale=Math.min(scene.stage.clientWidth/(width+36),scene.stage.clientHeight/viewHeight);
+    Object.assign(scene.foreign.style,{width:fieldBox.w+'px',height:fieldBox.h+'px',transform:`translate(${(scene.stage.clientWidth-(width+36)*scale)/2+(fieldBox.x+18)*scale}px,${(scene.stage.clientHeight-viewHeight*scale)/2+(fieldBox.y+18)*scale}px) scale(${scale})`});
     if(scene.w===width&&scene.laidOut)return;
     scene.w=width;scene.laidOut=true;
     scene.canvas.setAttribute('viewBox',`-18 -18 ${width+36} ${(scene.vertical?660:500)+36}`);
     const field=infieldBounds(scene.vertical,width);scene.fieldBounds=field;
-    Object.entries({x:field.x,y:field.y,width:field.w,height:field.h}).forEach(([k,v])=>scene.foreign.setAttribute(k,v));
+
     scene.scenery.replaceChildren();
     const vertical=scene.vertical;
     scene.scenery.append(svg('path',{d:path(geometry(-.8,vertical,width)),class:'circuit-kerb'}),svg('path',{d:path(geometry(8,vertical,width)),class:'circuit-inner-edge'}));
@@ -383,7 +388,8 @@ window.APEX_TRACK = (() => {
     };
     frame(start);
     // The infield is a compact identity key; the same identities also travel with the cars.
-    scene.infield.innerHTML=`<div class="circuit-score-key" tabindex="0" title="${options.escape(options.scaleHelp)}" aria-label="${options.escape(options.scaleHelp)}">${options.escape(options.scoreTitle)} <span>0—100</span></div><div class="circuit-roster">${scene.items.map(item=>`<div class="circuit-roster-row" data-flow-driver="${item.key}" style="--team:${item.team}"><button class="circuit-identity" data-race-driver="${item.key}" aria-label="${options.escape(item.name)}"><span class="circuit-rank">${item.rank}</span><span class="circuit-name">${options.flag(item.driver)}${options.escape(item.displayName||item.name)}</span><strong>${item.scoreLabel}${scene.vertical?`<em class="circuit-comparison-delta ${item.comparisonChange>0?'rank-up':item.comparisonChange<0?'rank-down':''}" title="${options.escape(options.comparisonTitle)}">${item.comparisonChange==null?'—':item.comparisonChange>0?'▲'+item.comparisonChange:item.comparisonChange<0?'▼'+(-item.comparisonChange):'='}</em>`:''}</strong><span class="circuit-delta ${item.change>0?'rank-up':item.change<0?'rank-down':''}">${item.change>0?'▲'+item.change:item.change<0?'▼'+(-item.change):'—'}</span></button></div>`).join('')}</div>${!scene.items.length?`<div class="circuit-empty">${options.escape(options.empty)}</div>`:''}`;
+    scene.infield.innerHTML=`<div class="circuit-score-key" tabindex="0" title="${options.escape(options.scaleHelp)}" aria-label="${options.escape(options.scaleHelp)}">${options.escape(options.scoreTitle)} <span>0—100</span></div><div class="circuit-roster">${scene.items.map(item=>`<div class="circuit-roster-row" data-flow-driver="${item.key}" style="--team:${item.team}"><button class="circuit-identity" data-race-driver="${item.key}" title="${options.escape(options.carHelp)}" aria-label="${options.escape(item.name)}"><span class="circuit-rank">${item.rank}</span><span class="circuit-name"><svg class="roster-car" viewBox="0 0 96 44" aria-hidden="true"><use href="./assets/studio/icons.svg#race-car"/></svg>${options.flag(item.driver)}${options.escape(item.displayName||item.name)}</span><strong>${item.scoreLabel}${scene.vertical?`<em class="circuit-comparison-delta ${item.comparisonChange>0?'rank-up':item.comparisonChange<0?'rank-down':''}" title="${options.escape(options.comparisonTitle)}">${item.comparisonChange==null?'—':item.comparisonChange>0?'▲'+item.comparisonChange:item.comparisonChange<0?'▼'+(-item.comparisonChange):'='}</em>`:''}</strong><span class="circuit-delta ${item.change>0?'rank-up':item.change<0?'rank-down':''}">${item.change>0?'▲'+item.change:item.change<0?'▼'+(-item.change):'—'}</span></button></div>`).join('')}</div>${!scene.items.length?`<div class="circuit-empty">${options.escape(options.empty)}</div>`:''}`;
+    if(focusedDriver)highlight(focusedDriver,true);
     if(!reduced()&&options.animate!==false)scene.infield.querySelectorAll('[data-flow-driver]').forEach(el=>{
       const before=oldRoster.get(el.dataset.flowDriver);
       if(before){const dx=before.x-el.offsetLeft,dy=before.y-el.offsetTop;if(dx||dy)el.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:'none'}],{duration:500,easing:'cubic-bezier(.22,.7,.2,1)'});}

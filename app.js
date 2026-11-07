@@ -14,9 +14,7 @@ const PRESETS = {};
 const DEFAULT_METRIC_WEIGHT = 10;
 
 const SCENARIO_COLORS = ["#f00827", "#43d5ff", "#c7ff38", "#ffb020", "#ba75ff", "#ff6fb1"];
-// Keep the original F1 metric palette stable across historical and modern datasets.
-const METRIC_COLORS = ["#fa4e55", "#86d9ff", "#ff8b4d", "#ffc24b", "#fae065", "#d2a7ff", "#ff6c9b", "#a6d665", "#43c4a7", "#49b9dd", "#667fe0", "#a37ce2", "#e783c5", "#d7aa68", "#88bfd0", "#b7c85e", "#f2a66b"];
-function metricColor(key) { return METRIC_COLORS[Math.max(0, METRIC_KEYS.indexOf(key)) % METRIC_COLORS.length]; }
+function metricColor(key) { return window.APEX_METRIC_TEXTURES.color(key); }
 const COUNTRY_REGIONS = {ARG:"AR",AUS:"AU",AUT:"AT",BEL:"BE",BRA:"BR",CAN:"CA",CHE:"CH",CHL:"CL",CHN:"CN",COL:"CO",CZE:"CZ",DEN:"DK",DEU:"DE",DNK:"DK",ESP:"ES",FIN:"FI",FRA:"FR",GBR:"GB",GER:"DE",HUN:"HU",IDN:"ID",IND:"IN",IRL:"IE",ITA:"IT",JPN:"JP",LIE:"LI",MAR:"MA",MCO:"MC",MEX:"MX",MON:"MC",MYS:"MY",NED:"NL",NLD:"NL",NZL:"NZ",POL:"PL",PRT:"PT",RUS:"RU",SWE:"SE",THA:"TH",URY:"UY",USA:"US",VEN:"VE",ZAF:"ZA",ZWE:"ZW"};
 const TEAM_MARKS = {"Mercedes":"mercedes","Ferrari":"ferrari","Red Bull Racing":"redbullracing","Red Bull":"redbullracing","McLaren":"mclaren","Racing Bulls":"racingbulls","Alpine":"alpine","Haas F1 Team":"haasf1team","Haas":"haasf1team","Audi":"audi","Williams":"williams","Aston Martin":"astonmartin","Cadillac":"cadillac"};
 // Embedded PNG marks avoid extra requests and stale/missing image responses.
@@ -487,6 +485,7 @@ function resetMetric(key) {
 }
 
 function renderLineUp({animate = true} = {}) {
+  renderRankingContext();
   if (!state.dataset) return;
   const table = $("#lineup-table");
   const viewport = $("#lineup-scroll");
@@ -612,7 +611,7 @@ function raceOptions(setup, filtered, ranking, vertical, animate = true) {
     },
     toggleLabel:(key,active)=>t(active?'disableMetric':'enableMetric',{name:metricName(key)}),
     zoomIn:t('circuitZoomIn'), zoomOut:t('circuitZoomOut'), fit:t('circuitFit'),
-    escape:escapeHTML, detail:driverDetailContent, flag:nationalityFlag,
+    escape:escapeHTML, detail:driverDetailContent, flag:nationalityFlag, carHelp:t('carMeaning'),
     label:t('circuitAria'), scoreTitle:t('scoreColumn'), scaleHelp:t('circuitScale'), histogramHelp:t('histogramMeaning'),
     previous:t('previousGrid'), next:t('nextGrid'), empty:t('inverseNoResults'),
     segmentTitle:(driver,key,value)=>t('contributionTooltip',{name:metricName(key),raw:displayValue(key,driver[key]),weight:formatWeight(setup.weights[key]||0),points:(value*100).toFixed(1)}),
@@ -649,7 +648,7 @@ function renderRaceComparison() {
     column.className='comparison-column';column.dataset.scenario=setup.id;
     column.style.cssText=`height:${height}px;width:${width}px;--scenario:${setup.color};view-transition-name:${setup.id===state.activeScenario?'ranking-focus':'none'}`;
     column.setAttribute('aria-label',t('comparisonRankAria',{name}));
-    column.innerHTML=`<div class="comparison-column-head">${studioIcon('flag','column-flag')}<span class="comparison-reference" title="${escapeHTML(t('rankComparedTo',{name:scenarioName(state.scenarios[0])}))}">${setup.id===state.scenarios[0].id?escapeHTML(t('rankReference')):'Δ P'}</span><strong class="scenario-title" data-rename-scenario="${setup.id}" tabindex="0" role="button" title="${escapeHTML(name)}">${escapeHTML(name)}</strong><div class="column-actions"><button data-expand-scenario="${setup.id}" title="${escapeHTML(t('lineupTitle'))}" aria-label="${escapeHTML(t('lineupTitle'))}">${studioIcon('expand')}</button><button data-delete-scenario="${setup.id}" title="${escapeHTML(t('scenarioRemove',{name}))}" aria-label="${escapeHTML(t('scenarioRemove',{name}))}">${studioIcon('close')}</button></div></div>`;
+    column.innerHTML=`<div class="comparison-column-head">${studioIcon('flag','column-flag')}<span class="comparison-reference" title="${escapeHTML(t('rankComparedTo',{name:scenarioName(state.scenarios[0])}))}">${setup.id===state.scenarios[0].id?escapeHTML(t('rankReference')):'Δ P'}</span><strong class="scenario-title" data-rename-scenario="${setup.id}" tabindex="0" role="button" title="${escapeHTML(name)}">${escapeHTML(name)}</strong><div class="column-actions"><button data-expand-scenario="${setup.id}" title="${escapeHTML(t('editRanking'))}" aria-label="${escapeHTML(t('editRanking'))}">${escapeHTML(t('editRanking'))}</button><button data-delete-scenario="${setup.id}" title="${escapeHTML(t('scenarioRemove',{name}))}" aria-label="${escapeHTML(t('scenarioRemove',{name}))}">${studioIcon('close')}</button></div></div>`;
     const host=existing.get(setup.id)||document.createElement('div');host.className='race-comparison-host';column.append(host);board.append(column);
     const ranking=scenarioRanking(setup);
     window.APEX_TRACK.render(host,setup.id,raceOptions(setup,filteredRanking(ranking),ranking,true));
@@ -803,7 +802,7 @@ function renderComparison() {
       const delta = change > 0 ? `▲${change}` : change < 0 ? `▼${-change}` : '';
       return `<div class="compare-row ${direction}" data-flow-driver="${key}" style="--team:#${(driver.team_colour || '777777').replace('#','')}" title="${escapeHTML(t('comparisonRowTooltip',{name:driver.full_name,rank:driver.availableWeight > 0 ? rank : "—",score:scoreLabel(driver)}))}"><span class="compare-rank">${driver.availableWeight > 0 ? rank : "—"}</span><span class="compare-driver">${escapeHTML(driver.name_acronym || driver.driver_number)}</span>${stackedBar(driver,scenario.weights,scenario.enabled,{small:true})}<span class="comparison-score"><strong>${scoreLabel(driver)}</strong><small>${delta}</small></span></div>`;
     }).join('');
-    return `<section class="comparison-column" data-scenario="${scenario.id}" style="left:${index*(columnWidth+gap)}px;height:${height}px;--scenario:${scenario.color};view-transition-name:${scenario.id===state.activeScenario?'ranking-focus':'none'}" aria-label="${escapeHTML(t('comparisonRankAria',{name}))}"><div class="comparison-column-head">${studioIcon("flag", "column-flag")}<strong class="scenario-title" data-rename-scenario="${scenario.id}" tabindex="0" role="button" title="${escapeHTML(name)}">${escapeHTML(name)}</strong><div class="column-actions"><button data-expand-scenario="${scenario.id}" title="${escapeHTML(t('lineupTitle'))}" aria-label="${escapeHTML(t('lineupTitle'))}">${studioIcon("expand")}</button><button data-delete-scenario="${scenario.id}" title="${escapeHTML(t('scenarioRemove',{name}))}" aria-label="${escapeHTML(t('scenarioRemove',{name}))}">${studioIcon("close")}</button></div></div><div class="comparison-rows" tabindex="0" aria-label="${escapeHTML(t('comparisonRankAria',{name}))}" style="height:${listHeight}px">${rows || `<div class="empty-chart">${escapeHTML(t('resultsShown',{shown:0,total:0}))}</div>`}</div></section>`;
+    return `<section class="comparison-column" data-scenario="${scenario.id}" style="left:${index*(columnWidth+gap)}px;height:${height}px;--scenario:${scenario.color};view-transition-name:${scenario.id===state.activeScenario?'ranking-focus':'none'}" aria-label="${escapeHTML(t('comparisonRankAria',{name}))}"><div class="comparison-column-head">${studioIcon("flag", "column-flag")}<strong class="scenario-title" data-rename-scenario="${scenario.id}" tabindex="0" role="button" title="${escapeHTML(name)}">${escapeHTML(name)}</strong><div class="column-actions"><button data-expand-scenario="${scenario.id}" title="${escapeHTML(t('editRanking'))}" aria-label="${escapeHTML(t('editRanking'))}">${escapeHTML(t("editRanking"))}</button><button data-delete-scenario="${scenario.id}" title="${escapeHTML(t('scenarioRemove',{name}))}" aria-label="${escapeHTML(t('scenarioRemove',{name}))}">${studioIcon("close")}</button></div></div><div class="comparison-rows" tabindex="0" aria-label="${escapeHTML(t('comparisonRankAria',{name}))}" style="height:${listHeight}px">${rows || `<div class="empty-chart">${escapeHTML(t('resultsShown',{shown:0,total:0}))}</div>`}</div></section>`;
   }).join('');
   container.innerHTML = `<div class="comparison-board" style="width:${width}px;height:${height}px;--compare-row-height:${rowHeight}px">${columns}</div>`;
   const board = container.firstElementChild;
@@ -898,6 +897,20 @@ function scheduleInteractiveRender() {
     renderCode();
     requestComparisonRender();
   });
+}
+
+function renderRankingContext() {
+  if(!state.dataset)return;
+  let panel=$('#ranking-context');
+  if(!panel){panel=document.createElement('div');panel.id='ranking-context';panel.className='ranking-context';$('#single-view').append(panel);}
+  const count=state.dataset.metrics.filter(m=>state.enabled[m.key]!==false&&Number(state.weights[m.key])>0).length;
+  const signature=[state.language,state.dataset.year,count,state.scenarios.length,state.shape].join('|');
+  if(panel.dataset.signature===signature)return;panel.dataset.signature=signature;
+  const period=state.dataset.year==='all'?`${availableYears()[0]}–${availableYears().at(-1)}`:state.dataset.year;
+  const idle=t('rankingPeriod',{year:period,count});
+  panel.innerHTML=`<button class="ranking-method" title="${escapeHTML(t('rankingRule'))}" data-tooltip="${escapeHTML(t('rankingRule'))}" aria-label="${escapeHTML(t('rankingRule'))}">${escapeHTML(t('weightedScore'))}<span aria-hidden="true">ⓘ</span></button><span class="metric-focus-caption" data-idle="${escapeHTML(idle)}" aria-live="polite">${escapeHTML(idle)}</span>${state.scenarios.length>1?`<button id="compare-ready" title="${escapeHTML(t('editThenCompare'))}">${escapeHTML(t('compareRankings',{count:state.scenarios.length}))} →</button>`:''}`;
+  panel.querySelector('.ranking-method').addEventListener('click',()=>$('#help-toggle').click());
+  panel.querySelector('#compare-ready')?.addEventListener('click',()=>{syncActiveScenario();setOverview(true);});
 }
 
 function renderAll({preserveWeightDOM = false} = {}) {
@@ -1235,8 +1248,8 @@ function bindEvents() {
   $("#reset-year-range").addEventListener("click", () => loadSeason("all"));
   $("#save-scenario").addEventListener("click", () => {
     syncActiveScenario();
-    addScenarioFromWeights();
-    renderAll();
+    addScenarioFromWeights({compare:false});
+    openScenario(state.activeScenario);
   });
   bindStudio();
 }
@@ -1303,7 +1316,7 @@ function removeScenario(id) {
   if(state.scenarios.length===1)setOverview(false);
   else requestComparisonRender();
 }
-function addScenarioFromWeights() {
+function addScenarioFromWeights({compare=true} = {}) {
   const s = frozenScenario(`My F1 Ranking ${state.scenarios.length + 1}`, state.weights, state.scenarios.length, state.enabled);
   s.rankPositions = new Map(state.ranked.map((driver, i) => [driverKey(driver), i + 1]));
   const source = state.overview ? document.querySelector(`.comparison-column[data-scenario="${state.activeScenario}"] .comparison-rows`) : $('#lineup-scroll');
@@ -1315,7 +1328,7 @@ function addScenarioFromWeights() {
   }
   state.scenarios.push(s); state.activeScenario = s.id;
   $("#setup-name").value = s.name;
-  setOverview(true);
+  if(compare)setOverview(true);
 }
 function fitCanvas() {
   const board = $("#comparison-chart .comparison-board"), viewport = $("#comparison-chart");
@@ -1448,6 +1461,9 @@ function bindStudio() {
     }
     const key=origin&&(origin.dataset.segmentMetric||origin.dataset.controlMetric||origin.dataset.toggleMetric||origin.dataset.metric);
     highlightedOrigin=origin;
+    const caption=$('.metric-focus-caption');
+    if(caption){caption.style.borderLeft=key?`3px solid ${metricColor(key)}`:'';caption.style.paddingLeft=key?'6px':'';}
+    if(caption)caption.textContent=key?`${metricName(key)} · ${metricDescription(key)}`:caption.dataset.idle;
     if(key===highlightedMetric&&!force)return;highlightedMetric=key;
     document.querySelectorAll('.stack-segment,.circuit-segment').forEach(el=>el.classList.toggle('metric-dimmed',Boolean(key)&&el.dataset.segmentMetric!==key));
     document.querySelectorAll('[data-metric]').forEach(el=>el.classList.toggle('is-linked-metric',Boolean(key)&&el.dataset.metric===key));

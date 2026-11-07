@@ -262,3 +262,11 @@ const TRACE_PANEL_UI={
 };
 Object.entries(TRACE_PANEL_UI).forEach(([language,copy])=>Object.assign(APEX_I18N[language].ui,Object.fromEntries(['rankTraceTitle','rankTraceBestFirst','rankTraceSetup','rankTraceRank','rankTraceCollapse'].map((key,i)=>[key,copy[i]]))));
 window.APEX_I18N = {metricKeys: I18N_METRIC_KEYS, locales: APEX_I18N};
+
+const CLARITY_UI={
+ en:{rankingBasis:'Custom driver ranking',rankingRule:'Score /100: weighted average of normalized metrics. Missing values are excluded.',rankingPeriod:'Data: {year} · {count} active metrics',rankingInteraction:'Colors + textures identify metrics. Click one to compare on a straight baseline.',editRanking:'Edit weights',compareRankings:'Compare {count} rankings',editThenCompare:'Edit this ranking’s weights, then compare. Other rankings stay unchanged.',addRankingHint:'Create a copy, then edit its weights',carMeaning:'Driver marker; body color identifies the team. Not an actual car model.'},
+ zh:{rankingBasis:'自定义车手排名',rankingRule:'总分 /100：各指标标准化后的加权平均；缺失值不参与计算。',rankingPeriod:'数据：{year} · 已启用 {count} 项指标',rankingInteraction:'颜色与纹理代表指标；点击指标，可展开同基线直道比较。',editRanking:'编辑权重',compareRankings:'比较 {count} 个排名',editThenCompare:'调整当前方案的权重，再点击比较；其他排名保持不变。',addRankingHint:'创建副本，然后编辑新排名的权重',carMeaning:'赛车是车手标记，车身颜色对应车队，并非真实车型。'}
+};
+Object.entries(CLARITY_UI).forEach(([lang,copy])=>Object.assign(APEX_I18N[lang].ui,copy));
+
+Object.entries({en:'Weighted score /100',zh:'加权评分 /100',ja:'加重スコア /100',fr:'Score pondéré /100',ko:'가중 점수 /100',hi:'भारित स्कोर /100'}).forEach(([lang,label])=>{APEX_I18N[lang].ui.weightedScore=label;});

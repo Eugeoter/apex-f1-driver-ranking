@@ -1,10 +1,10 @@
 "use strict";
 window.APEX_METRIC_ORDER=(()=>{
- const storage='apex-metric-order';
+ let currentOrder=[]; // Session-only: reload always starts with the dataset's default order.
  const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
- function ordered(metrics){let keys=[];try{keys=JSON.parse(localStorage.getItem(storage)||'[]');}catch{}if(!Array.isArray(keys))keys=[];const rank=new Map(keys.map((k,i)=>[k,i]));return [...metrics].sort((a,b)=>(rank.get(a.key)??Infinity)-(rank.get(b.key)??Infinity));}
+ function ordered(metrics){const rank=new Map(currentOrder.map((k,i)=>[k,i]));return [...metrics].sort((a,b)=>(rank.get(a.key)??Infinity)-(rank.get(b.key)??Infinity));}
  function moved(keys,source,target,after){if(source===target||!keys.includes(source)||!keys.includes(target))return [...keys];const next=keys.filter(k=>k!==source);next.splice(next.indexOf(target)+(after?1:0),0,source);return next;}
- function save(keys){try{const old=JSON.parse(localStorage.getItem(storage)||'[]');localStorage.setItem(storage,JSON.stringify([...keys,...(Array.isArray(old)?old:[]).filter(k=>!keys.includes(k))]));}catch{}}
+ function save(keys){currentOrder=[...keys,...currentOrder.filter(k=>!keys.includes(k))];}
  function preview(card){
   const ghost=card.cloneNode(true),originals=[card,...card.querySelectorAll('*')],copies=[ghost,...ghost.querySelectorAll('*')];
   // Keep the seat/control layout when the preview leaves its original container.
